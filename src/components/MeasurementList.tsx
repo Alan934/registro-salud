@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MetricChips } from "@/components/MetricChips";
+import { TagChips } from "@/components/TagChips";
 import type { Measurement } from "@/lib/model";
 import { formatDayShort } from "@/lib/tz";
 
@@ -48,6 +49,8 @@ export function MeasurementList({
               </div>
 
               <MetricChips values={m} />
+
+              <TagChips tags={m.tags} />
 
               {m.note ? (
                 <p className="text-sm break-words text-muted">{m.note}</p>

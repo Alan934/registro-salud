@@ -1,38 +1,39 @@
-import { METRIC_BY_KEY, formatValue, type MetricKey } from "@/lib/metrics";
+import { METRIC_BY_KEY, type MetricKey } from "@/lib/metrics";
 import {
   SCALES,
   TONE_COLOR,
   markerPosition,
-  zoneFor,
+  zoneIn,
   zoneSegments,
+  type Scale,
 } from "@/lib/zones";
 
 /**
- * La barra de rangos: los tramos de referencia de la metrica y un marcador
- * donde cayo el valor. El tramo donde esta el valor va en color pleno y el
- * resto apagado, asi se ve enseguida donde quedo parado.
+ * La barra de rangos: los tramos de referencia y un marcador donde cayó el
+ * valor. El tramo donde está el valor va en color pleno y el resto apagado,
+ * así se ve enseguida dónde quedó parado.
  *
- * Es decorativa: lo que dice ya esta escrito al lado (el numero y la
+ * Es decorativa: lo que dice ya está escrito al lado (el número y la
  * pastilla "Normal" / "Alta"), por eso va oculta para lectores de pantalla.
  */
 export function RangeBar({
-  metricKey,
+  scale,
   value,
+  unit,
+  decimals,
   label,
   showLabels = true,
 }: {
-  metricKey: MetricKey;
+  scale: Scale;
   value: number | null;
-  /** Nombre de la serie, para las barras de presion (Máxima / Mínima). */
+  unit: string;
+  decimals: number;
+  /** Nombre de la serie, para las barras de presión (Máxima / Mínima). */
   label?: string;
   showLabels?: boolean;
 }) {
-  const scale = SCALES[metricKey];
-  if (!scale) return null;
-
   const segments = zoneSegments(scale);
-  const zone = zoneFor(metricKey, value);
-  const metric = METRIC_BY_KEY[metricKey];
+  const zone = zoneIn(scale, value);
 
   return (
     <div aria-hidden="true" className="space-y-1">
@@ -45,9 +46,9 @@ export function RangeBar({
             ) : (
               <>
                 <strong className="font-semibold">
-                  {formatValue(metricKey, value)}
+                  {value.toFixed(decimals)}
                 </strong>{" "}
-                <span className="text-muted">{metric.unit}</span>
+                <span className="text-muted">{unit}</span>
               </>
             )}
           </span>
@@ -92,7 +93,9 @@ export function RangeBar({
                 }`}
                 style={{
                   width: `${segment.width}%`,
-                  color: active ? TONE_COLOR[segment.zone.tone].strong : undefined,
+                  color: active
+                    ? TONE_COLOR[segment.zone.tone].strong
+                    : undefined,
                 }}
               >
                 {segment.zone.short}
@@ -102,5 +105,33 @@ export function RangeBar({
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** La misma barra, tomando la escala y la unidad de la métrica. */
+export function MetricRangeBar({
+  metricKey,
+  value,
+  label,
+  showLabels,
+}: {
+  metricKey: MetricKey;
+  value: number | null;
+  label?: string;
+  showLabels?: boolean;
+}) {
+  const scale = SCALES[metricKey];
+  if (!scale) return null;
+
+  const metric = METRIC_BY_KEY[metricKey];
+  return (
+    <RangeBar
+      scale={scale}
+      value={value}
+      unit={metric.unit}
+      decimals={metric.decimals}
+      label={label}
+      showLabels={showLabels}
+    />
   );
 }

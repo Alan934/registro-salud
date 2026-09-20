@@ -27,6 +27,21 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
   desplegarlo ([/api/dia/[day]](src/app/api/dia/[day]/route.ts)): con un año
   de datos son miles, y mandarlas todas de entrada para que queden escondidas
   atrás de un desplegable cerrado es puro peso.
+- **Etiquetas**: al cargar la toma se marca en qué momento fue (*en ayunas*,
+  *en reposo*, *después de comer*, *después de la medicación*...). Es un
+  catálogo cerrado a propósito ([tags.ts](src/lib/tags.ts)): el contexto
+  escrito a mano no se puede contar después, y en *Métricas* cada etiqueta
+  muestra cuántas veces se usó. La observación libre sigue estando para lo
+  que no entra en una etiqueta.
+- **Peso e IMC**: cargando la altura una sola vez en *Ajustes*, la tarjeta de
+  Peso y su baldosa muestran el **índice de masa corporal** con su zona
+  (bajo peso / normal / sobrepeso / obesidad, cortes de la OMS) y el informe
+  lo incluye. Sin altura cargada, la app no habla de IMC en ningún lado.
+- **Cómo se sintió**: lo único que no mide ningún aparato. Un puntaje de 0 a
+  10 con una carita, los síntomas del momento (*mareo*, *dolor de cabeza*,
+  *durmió mal*...) y una nota. En *Métricas* se ve el promedio del período,
+  un cuadradito por día y qué síntomas se repitieron. Un mismo 130/85 no es
+  lo mismo con mareo que sin nada.
 - **Nota del día**: un campo libre por fecha para lo que no es un número
   (cómo se sintió, qué comió, medicación, turnos). Un día puede tener sólo
   nota, sin ninguna toma.
@@ -131,8 +146,10 @@ npm run dev
 
 La app queda en `http://localhost:3000`.
 
-`npm run db:init` crea las tablas `measurements` y `daily_notes` en Neon. Es
-idempotente: se puede correr las veces que haga falta.
+`npm run db:init` crea en Neon las tablas `measurements`, `daily_notes`,
+`settings` y `mood_logs`, y agrega la columna `tags` a `measurements` si
+todavía no está. Es idempotente: se puede correr las veces que haga falta, y
+hay que correrlo después de actualizar para que las tablas nuevas existan.
 
 ## Deploy en Vercel
 
@@ -149,7 +166,8 @@ src/
       page.tsx        Hoy: cargar toma, promedio del día, nota del día
       metricas/       gráficos, promedios diarios y detalle por horario
       toma/[id]/      editar o borrar una toma
-    api/dia/[day]/    las tomas de un día, para el detalle desplegable
+      ajustes/        la altura, para el IMC
+    api/dia/[day]/    el detalle de un día (tomas y cómo se sintió)
     api/metricas/pdf/ el informe del período, para descargar o compartir
     login/            ingreso con usuario y contraseña
     demo/             página pública de ejemplo, sin acceso a la base
@@ -158,6 +176,10 @@ src/
   components/         formularios, gráficos y piezas de UI
   lib/
     actions.ts        server actions (validación incluida)
+    tags.ts           catálogo de etiquetas de contexto de cada toma
+    mood.ts           cómo se sintió: puntaje, síntomas y resumen
+    bmi.ts            índice de masa corporal y sus cortes
+    settings.ts       ajustes guardados (hoy, la altura)
     zones.ts          tramos de referencia de cada métrica (la barra de colores)
     insights.ts       constancia: días registrados y racha
     dayparts.ts       mañana / tarde / noche (en SQL y en la demo)

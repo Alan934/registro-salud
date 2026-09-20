@@ -105,11 +105,17 @@ export const TONE_PILL: Record<ZoneTone, string> = {
   high: "pill-high",
 };
 
+/** En que zona de una escala cualquiera cae el valor. */
+export function zoneIn(scale: Scale, value: number | null): Zone | null {
+  if (value === null || Number.isNaN(value)) return null;
+  return scale.zones.find((zone) => zone.to === null || value < zone.to) ?? null;
+}
+
 /** En que zona cae el valor, o null si la metrica no tiene escala. */
 export function zoneFor(key: MetricKey, value: number | null): Zone | null {
   const scale = SCALES[key];
-  if (!scale || value === null || Number.isNaN(value)) return null;
-  return scale.zones.find((zone) => zone.to === null || value < zone.to) ?? null;
+  if (!scale) return null;
+  return zoneIn(scale, value);
 }
 
 /** El tono mas preocupante de varios, para resumir la presion en una pastilla. */

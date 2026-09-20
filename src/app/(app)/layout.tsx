@@ -26,6 +26,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <NavLink href="/">Hoy</NavLink>
               <NavLink href="/metricas">Métricas</NavLink>
             </span>
+
+            <Link
+              href="/ajustes"
+              title="Ajustes"
+              className="rounded-lg p-2 text-muted transition
+                         hover:bg-surface-soft hover:text-fg"
+            >
+              <GearIcon />
+              <span className="sr-only">Ajustes</span>
+            </Link>
+
             <form action={logoutAction}>
               <button
                 type="submit"
@@ -50,5 +61,23 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
       <BottomNav />
     </div>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M19.4 14.5a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5v.2a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1h.2a2 2 0 1 1 0 4H21a1.6 1.6 0 0 0-1.5 1Z" />
+    </svg>
   );
 }

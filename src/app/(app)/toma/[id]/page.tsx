@@ -54,6 +54,7 @@ export default async function EditMeasurementPage({
             pulse: measurement.pulse,
             temperature: measurement.temperature,
             note: measurement.note,
+            tags: measurement.tags,
             measuredAt: `${measurement.day}T${measurement.time}`,
           }}
         />

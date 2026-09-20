@@ -1,5 +1,6 @@
 import { METRIC_BY_KEY, METRICS, type MetricKey } from "@/lib/metrics";
 import type { NewMeasurement } from "@/lib/model";
+import { normalizeTags } from "@/lib/tags";
 import { fromDateTimeLocal } from "@/lib/tz";
 
 /**
@@ -44,6 +45,10 @@ export function readMeasurementInput(formData: FormData): ParsedMeasurement {
   }
 
   const note = String(formData.get("note") ?? "").trim();
+  // Una toma con etiquetas pero sin ningun numero ni observacion no dice nada.
+  const tags = normalizeTags(
+    formData.getAll("tags").map((value) => String(value)),
+  );
   if (filled === 0 && note === "") {
     return { error: "Cargá al menos un valor o una observación." };
   }
@@ -72,5 +77,7 @@ export function readMeasurementInput(formData: FormData): ParsedMeasurement {
     return { error: "La presión mínima tiene que ser menor que la máxima." };
   }
 
-  return { data: { ...values, note: note === "" ? null : note, measuredAt } };
+  return {
+    data: { ...values, note: note === "" ? null : note, tags, measuredAt },
+  };
 }

@@ -1,11 +1,13 @@
 "use client";
 
+import { TagPicker } from "@/components/TagPicker";
 import { METRIC_BY_KEY, type MetricKey } from "@/lib/metrics";
 
 export type MeasurementFormValues = Partial<Record<MetricKey, number | null>> & {
   id?: number;
   note?: string | null;
   measuredAt?: string;
+  tags?: readonly string[];
 };
 
 /** Orden de carga pensado para el uso diario. */
@@ -84,6 +86,8 @@ export function MeasurementFields({
           </div>
         ))}
       </div>
+
+      <TagPicker selected={values?.tags} idPrefix={idPrefix} />
 
       <div className="space-y-1.5">
         <label

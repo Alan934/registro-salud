@@ -5,12 +5,16 @@ import { MeasurementForm } from "@/components/MeasurementForm";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
 import { MetricTiles, toTileSeries } from "@/components/MetricTiles";
+import { MoodForm } from "@/components/MoodForm";
+import { MoodList } from "@/components/MoodList";
 import { buildDayMarks, countMeasured, currentStreak } from "@/lib/insights";
 import {
   getDaySummaries,
   getLatestValues,
   getMeasurementsForDay,
+  getMoodLogsForDay,
 } from "@/lib/queries";
+import { getHeightCm } from "@/lib/settings";
 import {
   formatDayLong,
   formatNowText,
@@ -30,10 +34,12 @@ export default async function TodayPage() {
   const windowFrom = shiftDay(day, -(WINDOW_DAYS - 1));
   const stripFrom = shiftDay(day, -(STRIP_DAYS - 1));
 
-  const [measurements, latest, recent] = await Promise.all([
+  const [measurements, latest, recent, heightCm, moods] = await Promise.all([
     getMeasurementsForDay(day),
     getLatestValues(),
     getDaySummaries(windowFrom, day),
+    getHeightCm(),
+    getMoodLogsForDay(day),
   ]);
 
   const now = new Date();
@@ -100,6 +106,7 @@ export default async function TodayPage() {
           latest={latest}
           series={toTileSeries(ascending)}
           today={day}
+          heightCm={heightCm}
         />
       </section>
 
@@ -119,6 +126,26 @@ export default async function TodayPage() {
       <section className="card p-5">
         <h2 className="mb-3 text-lg font-semibold">Tomas de hoy</h2>
         <MeasurementList measurements={measurements} />
+      </section>
+
+      <section id="animo" className="card scroll-mt-20 p-5">
+        <h2 className="mb-1 text-lg font-semibold">¿Cómo se siente?</h2>
+        <p className="mb-4 text-sm text-muted">
+          Lo que no mide ningún aparato. Un mismo 130/85 no es lo mismo con
+          mareo que sin nada.
+        </p>
+
+        <MoodForm
+          nowValue={toDateTimeLocal(now)}
+          nowText={formatNowText(now)}
+        />
+
+        {moods.length > 0 ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <h3 className="eyebrow mb-3">Registros de hoy</h3>
+            <MoodList logs={moods} />
+          </div>
+        ) : null}
       </section>
 
       <section className="card p-5">

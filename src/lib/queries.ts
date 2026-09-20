@@ -7,7 +7,9 @@ import type {
   LatestValue,
   Measurement,
   MetricValues,
+  MoodLog,
   NewMeasurement,
+  NewMoodLog,
 } from "@/lib/model";
 import { TIME_ZONE } from "@/lib/tz";
 
@@ -16,7 +18,9 @@ export type {
   LatestValue,
   Measurement,
   MetricValues,
+  MoodLog,
   NewMeasurement,
+  NewMoodLog,
 };
 
 type Row = Record<string, unknown>;
@@ -32,7 +36,7 @@ const SELECT_COLUMNS = `
   measured_at,
   to_char(measured_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD') AS day,
   to_char(measured_at AT TIME ZONE '${TIME_ZONE}', 'HH24:MI') AS time,
-  weight, systolic, diastolic, glucose, spo2, pulse, temperature, note
+  weight, systolic, diastolic, glucose, spo2, pulse, temperature, note, tags
 `;
 
 function toMeasurement(row: Row): Measurement {
@@ -46,6 +50,7 @@ function toMeasurement(row: Row): Measurement {
     day: String(row.day),
     time: String(row.time),
     note: (row.note as string | null) ?? null,
+    tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
   };
 }
 
@@ -68,7 +73,7 @@ function toDaySummary(row: Row): DaySummary {
 export async function createMeasurement(input: NewMeasurement): Promise<void> {
   await sql`
     INSERT INTO measurements
-      (measured_at, weight, systolic, diastolic, glucose, spo2, pulse, temperature, note)
+      (measured_at, weight, systolic, diastolic, glucose, spo2, pulse, temperature, note, tags)
     VALUES (
       ${input.measuredAt.toISOString()},
       ${input.weight ?? null},
@@ -78,7 +83,8 @@ export async function createMeasurement(input: NewMeasurement): Promise<void> {
       ${input.spo2 ?? null},
       ${input.pulse ?? null},
       ${input.temperature ?? null},
-      ${input.note}
+      ${input.note},
+      ${input.tags}::text[]
     )
   `;
 }
@@ -97,7 +103,8 @@ export async function updateMeasurement(
       spo2 = ${input.spo2 ?? null},
       pulse = ${input.pulse ?? null},
       temperature = ${input.temperature ?? null},
-      note = ${input.note}
+      note = ${input.note},
+      tags = ${input.tags}::text[]
     WHERE id = ${id}
   `;
 }
@@ -127,6 +134,12 @@ export async function getMeasurement(id: number): Promise<Measurement | null> {
 function dayRangeFilter(from: string, to: string): string {
   return `measured_at >= (${from}::date::timestamp AT TIME ZONE '${TIME_ZONE}')
       AND measured_at <  ((${to}::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}')`;
+}
+
+/** Igual que dayRangeFilter pero para la tabla de como se sintio. */
+function moodRangeFilter(from: string, to: string): string {
+  return `logged_at >= (${from}::date::timestamp AT TIME ZONE '${TIME_ZONE}')
+      AND logged_at <  ((${to}::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}')`;
 }
 
 /** Tomas de un dia puntual, de la mas temprana a la mas tarde. */
@@ -329,4 +342,95 @@ export async function getDayPartAverages(
     ) as Record<MetricKey, number>;
     return [{ ...values, part: part.id, total: Number(row.total ?? 0), counts }];
   });
+}
+
+export type TagCount = { tag: string; total: number };
+
+/**
+ * Cuantas veces se uso cada etiqueta en el rango. `unnest` abre el arreglo de
+ * cada toma en una fila por etiqueta; las tomas sin etiquetas no aportan
+ * ninguna y quedan afuera solas.
+ */
+export async function getTagCounts(
+  fromDay: string,
+  toDay: string,
+): Promise<TagCount[]> {
+  const rows = (await sql.query(
+    `SELECT tag, count(*)::int AS total
+       FROM measurements, unnest(tags) AS tag
+      WHERE ${dayRangeFilter("$1", "$2")}
+      GROUP BY tag
+      ORDER BY total DESC, tag ASC`,
+    [fromDay, toDay],
+  )) as Row[];
+
+  return rows.map((row) => ({
+    tag: String(row.tag),
+    total: Number(row.total ?? 0),
+  }));
+}
+
+/* ------------------------- como se sintio ------------------------------ */
+
+const MOOD_COLUMNS = `
+  id,
+  logged_at,
+  to_char(logged_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD') AS day,
+  to_char(logged_at AT TIME ZONE '${TIME_ZONE}', 'HH24:MI') AS time,
+  mood, symptoms, note
+`;
+
+function toMoodLog(row: Row): MoodLog {
+  return {
+    id: Number(row.id),
+    loggedAt: new Date(row.logged_at as string).toISOString(),
+    day: String(row.day),
+    time: String(row.time),
+    mood: Number(row.mood),
+    symptoms: Array.isArray(row.symptoms) ? row.symptoms.map(String) : [],
+    note: (row.note as string | null) ?? null,
+  };
+}
+
+export async function createMoodLog(input: NewMoodLog): Promise<void> {
+  await sql`
+    INSERT INTO mood_logs (logged_at, mood, symptoms, note)
+    VALUES (
+      ${input.loggedAt.toISOString()},
+      ${input.mood},
+      ${input.symptoms}::text[],
+      ${input.note}
+    )
+  `;
+}
+
+export async function deleteMoodLog(id: number): Promise<void> {
+  await sql`DELETE FROM mood_logs WHERE id = ${id}`;
+}
+
+/** Los registros de un dia puntual, del mas temprano al mas tarde. */
+export async function getMoodLogsForDay(day: string): Promise<MoodLog[]> {
+  const rows = (await sql.query(
+    `SELECT ${MOOD_COLUMNS}
+       FROM mood_logs
+      WHERE ${moodRangeFilter("$1", "$1")}
+      ORDER BY logged_at ASC`,
+    [day],
+  )) as Row[];
+  return rows.map(toMoodLog);
+}
+
+/** Los registros de un rango, del mas viejo al mas nuevo. */
+export async function getMoodLogsInRange(
+  fromDay: string,
+  toDay: string,
+): Promise<MoodLog[]> {
+  const rows = (await sql.query(
+    `SELECT ${MOOD_COLUMNS}
+       FROM mood_logs
+      WHERE ${moodRangeFilter("$1", "$2")}
+      ORDER BY logged_at ASC`,
+    [fromDay, toDay],
+  )) as Row[];
+  return rows.map(toMoodLog);
 }

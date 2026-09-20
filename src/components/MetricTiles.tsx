@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { MetricIcon } from "@/components/MetricIcon";
 import { Sparkline } from "@/components/Sparkline";
+import { BMI_SCALE, bmiFor } from "@/lib/bmi";
 import { CHART_GROUPS } from "@/lib/chart-groups";
 import { METRIC_BY_KEY, formatValue, type MetricKey } from "@/lib/metrics";
 import type { LatestValue } from "@/lib/model";
-import { TONE_PILL, worstTone, zoneFor } from "@/lib/zones";
+import { TONE_PILL, worstTone, zoneFor, zoneIn } from "@/lib/zones";
 import { formatDayShort } from "@/lib/tz";
 
 export type TileSeries = Partial<Record<MetricKey, Array<number | null>>>;
@@ -18,6 +19,7 @@ export function MetricTiles({
   series,
   today,
   hrefBase = "/metricas",
+  heightCm = null,
 }: {
   latest: Partial<Record<MetricKey, LatestValue>>;
   /** Valores por dia para la linea de tendencia, del mas viejo al mas nuevo. */
@@ -25,6 +27,8 @@ export function MetricTiles({
   today: string;
   /** Adonde llevan las baldosas. Vacio = anclas en la misma pagina. */
   hrefBase?: string;
+  /** Altura cargada en Ajustes: con ella la baldosa de peso muestra el IMC. */
+  heightCm?: number | null;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -40,6 +44,13 @@ export function MetricTiles({
         );
         const zoneLabel =
           zones.length === 1 ? zones[0]?.label : tone ? labelFor(zones, tone) : null;
+
+        // El peso no tiene zonas propias: lo que se puede leer es el IMC.
+        const bmi =
+          group.id === "weight"
+            ? bmiFor(latest.weight?.value ?? null, heightCm)
+            : null;
+        const bmiZone = bmi === null ? null : zoneIn(BMI_SCALE, bmi);
 
         const text =
           values.every((value) => value === null)
@@ -80,7 +91,11 @@ export function MetricTiles({
                   <span className="text-xs text-muted">{group.unit}</span>
                 </p>
 
-                {zoneLabel && tone ? (
+                {bmi !== null && bmiZone ? (
+                  <span className={`pill ${TONE_PILL[bmiZone.tone]} self-start`}>
+                    IMC {bmi.toFixed(1)} · {bmiZone.label}
+                  </span>
+                ) : zoneLabel && tone ? (
                   <span className={`pill ${TONE_PILL[tone]} self-start`}>
                     {zoneLabel}
                   </span>

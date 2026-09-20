@@ -1,9 +1,12 @@
 import { METRICS, type MetricKey } from "@/lib/metrics";
+import { normalizeTags } from "@/lib/tags";
+import { normalizeSymptoms } from "@/lib/mood";
 import type {
   DaySummary,
   LatestValue,
   Measurement,
   MetricValues,
+  MoodLog,
 } from "@/lib/model";
 import { fromDateTimeLocal, shiftDay } from "@/lib/tz";
 
@@ -39,18 +42,35 @@ const DAY_NOTES: Record<number, string> = {
   9: "Día tranquilo, sin novedades.",
 };
 
+/** Etiquetas tipicas de cada toma del dia, para que la demo se vea real. */
+const DEMO_TAGS = [
+  ["al-levantarse", "en-ayunas"],
+  ["despues-comer", "en-reposo"],
+  ["al-acostarse", "en-reposo"],
+];
+
 const DEMO_DAYS = 21;
+
+/** Sintomas que aparecen en los dias flojos de la demo. */
+const DEMO_SYMPTOMS = [
+  ["cansancio"],
+  ["dolor-cabeza", "mareo"],
+  ["durmio-mal"],
+];
 
 export type DemoData = {
   measurements: Measurement[];
   dayNotes: Record<string, string>;
+  moods: MoodLog[];
 };
 
 export function buildDemoData(today: string): DemoData {
   const random = mulberry32(20260919);
   const measurements: Measurement[] = [];
   const dayNotes: Record<string, string> = {};
+  const moods: MoodLog[] = [];
   let id = 1;
+  let moodId = 1;
 
   const pick = (min: number, max: number) =>
     Math.round(min + random() * (max - min));
@@ -94,11 +114,36 @@ export function buildDemoData(today: string): DemoData {
         day,
         time,
         note: random() > 0.55 ? NOTES[Math.floor(random() * NOTES.length)] : null,
+        tags: normalizeTags(DEMO_TAGS[t] ?? []),
       });
     }
   }
 
-  return { measurements, dayNotes };
+  // Un registro de como se sintio por dia, a la nochecita.
+  for (let back = DEMO_DAYS - 1; back >= 0; back--) {
+    const day = shiftDay(today, -back);
+    const loggedAt = fromDateTimeLocal(`${day}T21:00`);
+    if (!loggedAt) continue;
+
+    const mood = 5 + Math.round(random() * 4);
+    const flojo = mood <= 6;
+
+    moods.push({
+      id: moodId++,
+      loggedAt: loggedAt.toISOString(),
+      day,
+      time: "21:00",
+      mood,
+      symptoms: flojo
+        ? normalizeSymptoms(
+            DEMO_SYMPTOMS[Math.floor(random() * DEMO_SYMPTOMS.length)],
+          )
+        : [],
+      note: flojo && random() > 0.5 ? "Se acostó temprano." : null,
+    });
+  }
+
+  return { measurements, dayNotes, moods };
 }
 
 /**

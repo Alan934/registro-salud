@@ -5,8 +5,11 @@ import { buildReportPdf, reportFileName } from "@/lib/pdf";
 import {
   getDaySummaries,
   getMeasurementsInRange,
+  getMoodLogsInRange,
   getPeriodAverages,
+  getTagCounts,
 } from "@/lib/queries";
+import { getHeightCm } from "@/lib/settings";
 import { buildTrends } from "@/lib/trends";
 import { formatDayShort } from "@/lib/tz";
 
@@ -27,13 +30,23 @@ export async function GET(request: NextRequest) {
   const { fromDay, toDay } = period;
   const previous = previousPeriod(period);
 
-  const [summaries, measurements, currentAverages, previousAverages] =
-    await Promise.all([
-      getDaySummaries(fromDay, toDay),
-      getMeasurementsInRange(fromDay, toDay),
-      getPeriodAverages(fromDay, toDay),
-      getPeriodAverages(previous.fromDay, previous.toDay),
-    ]);
+  const [
+    summaries,
+    measurements,
+    currentAverages,
+    previousAverages,
+    tagCounts,
+    heightCm,
+    moodLogs,
+  ] = await Promise.all([
+    getDaySummaries(fromDay, toDay),
+    getMeasurementsInRange(fromDay, toDay),
+    getPeriodAverages(fromDay, toDay),
+    getPeriodAverages(previous.fromDay, previous.toDay),
+    getTagCounts(fromDay, toDay),
+    getHeightCm(),
+    getMoodLogsInRange(fromDay, toDay),
+  ]);
 
   const pdf = await buildReportPdf({
     summaries,
@@ -46,6 +59,9 @@ export async function GET(request: NextRequest) {
     previousLabel: `${formatDayShort(previous.fromDay)} al ${formatDayShort(
       previous.toDay,
     )}`,
+    tagCounts,
+    heightCm,
+    moodLogs,
     generatedAt: new Date(),
   });
 

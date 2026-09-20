@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { MetricChart, type ChartPoint } from "@/components/MetricChart";
 import { MetricIcon } from "@/components/MetricIcon";
-import { RangeBar } from "@/components/RangeBar";
+import { MetricRangeBar, RangeBar } from "@/components/RangeBar";
+import { BMI_SCALE, bmiFor } from "@/lib/bmi";
 import { CHART_GROUPS, type ChartGroup } from "@/lib/chart-groups";
 import { formatValue, type MetricKey } from "@/lib/metrics";
-import { TONE_PILL, worstTone, zoneFor } from "@/lib/zones";
+import { TONE_PILL, worstTone, zoneFor, zoneIn } from "@/lib/zones";
 
 type SerieStats = {
   key: MetricKey;
@@ -19,10 +21,16 @@ type SerieStats = {
 export function ChartGrid({
   points,
   lastPrefix = "última lectura",
+  heightCm = null,
+  settingsHref = "/ajustes",
 }: {
   points: ChartPoint[];
   /** Que es el valor grande: la ultima toma o el promedio del ultimo dia. */
   lastPrefix?: string;
+  /** Altura cargada en Ajustes; sin ella la tarjeta de peso no muestra IMC. */
+  heightCm?: number | null;
+  /** Adonde se manda a cargar la altura (la demo no tiene esa pantalla). */
+  settingsHref?: string | null;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -40,6 +48,8 @@ export function ChartGrid({
             points={points}
             lastLabel={lastLabelFor(points, group.series.map((s) => s.key))}
             lastPrefix={lastPrefix}
+            heightCm={heightCm}
+            settingsHref={settingsHref}
           />
         );
       })}
@@ -53,12 +63,16 @@ function GroupCard({
   points,
   lastLabel,
   lastPrefix,
+  heightCm,
+  settingsHref,
 }: {
   group: ChartGroup;
   stats: SerieStats[];
   points: ChartPoint[];
   lastLabel: string | null;
   lastPrefix: string;
+  heightCm: number | null;
+  settingsHref: string | null;
 }) {
   const zones = stats.map((item) => zoneFor(item.key, item.last));
   const tone = worstTone(zones.flatMap((zone) => (zone ? [zone.tone] : [])));
@@ -110,13 +124,21 @@ function GroupCard({
 
       <div className="mt-3 space-y-2.5">
         {stats.map((item) => (
-          <RangeBar
+          <MetricRangeBar
             key={item.key}
             metricKey={item.key}
             value={item.last}
             label={stats.length > 1 ? item.label : undefined}
           />
         ))}
+
+        {group.id === "weight" ? (
+          <BmiBlock
+            weightKg={stats[0].last}
+            heightCm={heightCm}
+            settingsHref={settingsHref}
+          />
+        ) : null}
       </div>
 
       {group.series.length > 1 ? (
@@ -168,6 +190,53 @@ function GroupCard({
         />
       </dl>
     </section>
+  );
+}
+
+/**
+ * El IMC del ultimo peso. Sale de la altura guardada en Ajustes: sin ella no
+ * hay cuenta posible, asi que en vez del dato se ofrece cargarla.
+ */
+function BmiBlock({
+  weightKg,
+  heightCm,
+  settingsHref,
+}: {
+  weightKg: number | null;
+  heightCm: number | null;
+  settingsHref: string | null;
+}) {
+  if (heightCm === null) {
+    if (settingsHref === null) return null;
+    return (
+      <p className="text-xs text-muted">
+        <Link href={settingsHref} className="text-accent hover:underline">
+          Cargá tu altura
+        </Link>{" "}
+        y acá aparece el IMC.
+      </p>
+    );
+  }
+
+  const bmi = bmiFor(weightKg, heightCm);
+  if (bmi === null) return null;
+  const zone = zoneIn(BMI_SCALE, bmi);
+
+  return (
+    <div className="space-y-1 border-t border-line pt-2.5">
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="text-muted">IMC ({heightCm} cm)</span>
+        <span className="flex items-baseline gap-2">
+          <strong className="text-sm font-semibold tabular-nums">
+            {bmi.toFixed(1)}
+          </strong>
+          {zone ? (
+            <span className={`pill ${TONE_PILL[zone.tone]}`}>{zone.label}</span>
+          ) : null}
+        </span>
+      </div>
+      <RangeBar scale={BMI_SCALE} value={bmi} unit="kg/m²" decimals={1} />
+    </div>
   );
 }
 

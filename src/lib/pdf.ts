@@ -7,9 +7,13 @@ import {
   type PDFPage,
   type RGB,
 } from "pdf-lib";
+import { BMI_SCALE, bmiFor } from "@/lib/bmi";
 import { METRICS, METRIC_BY_KEY, formatValue, type MetricKey } from "@/lib/metrics";
-import type { DaySummary, Measurement } from "@/lib/model";
+import type { DaySummary, Measurement, MoodLog } from "@/lib/model";
+import { SYMPTOM_BY_ID, moodLevel, summarizeMood } from "@/lib/mood";
+import { TAG_BY_ID } from "@/lib/tags";
 import type { Trend } from "@/lib/trends";
+import { zoneIn } from "@/lib/zones";
 import { formatDayLong } from "@/lib/tz";
 
 /**
@@ -372,6 +376,12 @@ export type ReportInput = {
   trends: Trend[];
   /** El período con el que se compara, ya escrito ("21/07 al 19/08"). */
   previousLabel: string;
+  /** Cuántas veces se usó cada etiqueta, de la más usada a la menos. */
+  tagCounts: Array<{ tag: string; total: number }>;
+  /** Altura cargada en Ajustes; sin ella el informe no habla de IMC. */
+  heightCm: number | null;
+  /** Cómo se sintió, del registro más viejo al más nuevo. */
+  moodLogs: MoodLog[];
   generatedAt: Date;
 };
 
@@ -384,6 +394,9 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
     rangeLabel,
     trends,
     previousLabel,
+    tagCounts,
+    heightCm,
+    moodLogs,
     generatedAt,
   } = input;
   const period = `${formatDayNumeric(fromDay)} al ${formatDayNumeric(toDay)}`;
@@ -439,6 +452,47 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
     canvas.move(12);
   }
 
+  /* ------------------------------- imc ---------------------------------- */
+
+  // El ultimo peso del periodo: las tomas vienen de la mas vieja a la mas nueva.
+  const lastWeight = [...measurements]
+    .reverse()
+    .find((measurement) => measurement.weight !== null);
+  const bmi = bmiFor(lastWeight?.weight ?? null, heightCm);
+
+  if (heightCm !== null && bmi !== null && lastWeight) {
+    const zone = zoneIn(BMI_SCALE, bmi);
+    canvas.ensure(14);
+    canvas.draw(
+      `Altura ${heightCm} cm · IMC con el último peso (${formatValue(
+        "weight",
+        lastWeight.weight,
+      )} kg del ${formatDayNumeric(lastWeight.day)}): ${bmi.toFixed(1)} kg/m2${
+        zone ? ` — ${zone.label.toLowerCase()}` : ""
+      }`,
+      MARGIN,
+      8.5,
+      { color: MUTED },
+    );
+    canvas.move(12);
+  }
+
+  /* ---------------------------- etiquetas ------------------------------- */
+
+  const usedTags = tagCounts.filter((item) => TAG_BY_ID[item.tag]);
+
+  if (usedTags.length > 0) {
+    const text = usedTags
+      .map((item) => `${TAG_BY_ID[item.tag].label} (${item.total})`)
+      .join(" · ");
+    for (const line of canvas.wrap(`En qué contexto se midió: ${text}`, 8.5, CONTENT)) {
+      canvas.ensure(14);
+      canvas.draw(line, MARGIN, 8.5, { color: MUTED });
+      canvas.move(11);
+    }
+    canvas.move(4);
+  }
+
   /* --------------------------- detalle por dia -------------------------- */
 
   const daysWithMeasurements = summaries.filter((day) => day.total > 0);
@@ -458,6 +512,62 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
     [...daysWithMeasurements]
       .reverse()
       .forEach((day, index) => canvas.tableRow(DAY_COLUMNS, day, index));
+  }
+
+  /* --------------------------- como se sintio --------------------------- */
+
+  if (moodLogs.length > 0) {
+    const mood = summarizeMood(moodLogs);
+    canvas.move(10);
+    canvas.heading("Cómo se sintió");
+
+    if (mood.average !== null) {
+      canvas.draw(
+        `Promedio ${mood.average.toFixed(1)} de 10 (${moodLevel(
+          mood.average,
+        ).label.toLowerCase()}) · ${mood.total} ${
+          mood.total === 1 ? "registro" : "registros"
+        } en ${mood.byDay.length} ${mood.byDay.length === 1 ? "día" : "días"}`,
+        MARGIN,
+        9,
+      );
+      canvas.move(13);
+    }
+
+    if (mood.symptoms.length > 0) {
+      const text = mood.symptoms
+        .map(
+          (symptom) =>
+            `${SYMPTOM_BY_ID[symptom.id]?.label ?? symptom.id} (${symptom.total})`,
+        )
+        .join(" · ");
+      for (const line of canvas.wrap(`Síntomas anotados: ${text}`, 8.5, CONTENT)) {
+        canvas.ensure(14);
+        canvas.draw(line, MARGIN, 8.5, { color: MUTED });
+        canvas.move(11);
+      }
+    }
+
+    canvas.move(6);
+
+    for (const log of moodLogs) {
+      const symptoms = log.symptoms
+        .map((id) => SYMPTOM_BY_ID[id]?.label ?? id)
+        .join(", ");
+      const head = `${formatDayNumeric(log.day)} ${log.time} — ${
+        moodLevel(log.mood).label
+      } (${log.mood}/10)${symptoms === "" ? "" : ` · ${symptoms}`}`;
+      const noteLines = log.note ? canvas.wrap(log.note, 9, CONTENT - 12) : [];
+
+      canvas.ensure(14 + noteLines.length * 12);
+      canvas.draw(head, MARGIN, 9);
+      canvas.move(12);
+      for (const line of noteLines) {
+        canvas.draw(line, MARGIN + 12, 9, { color: MUTED });
+        canvas.move(12);
+      }
+      canvas.move(3);
+    }
   }
 
   /* ------------------------------- notas -------------------------------- */

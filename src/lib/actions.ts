@@ -3,13 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { checkCredentials, endSession, getSession, startSession } from "@/lib/auth";
+import { HEIGHT_MAX, HEIGHT_MIN, parseHeight } from "@/lib/bmi";
 import { readMeasurementInput } from "@/lib/measurement-input";
+import { readMoodInput } from "@/lib/mood";
 import {
   createMeasurement,
+  createMoodLog,
   deleteMeasurement,
+  deleteMoodLog,
   saveDailyNote,
   updateMeasurement,
 } from "@/lib/queries";
+import { HEIGHT_KEY, setSetting } from "@/lib/settings";
 import { todayKey } from "@/lib/tz";
 
 export type FormState = { error?: string; ok?: string };
@@ -99,6 +104,59 @@ export async function deleteMeasurementAction(formData: FormData) {
     refresh();
   }
   redirect(String(formData.get("redirectTo") ?? "/"));
+}
+
+/* --------------------------- como se sintio ---------------------------- */
+
+export async function createMoodAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireSession();
+  const parsed = readMoodInput(formData);
+  if ("error" in parsed) return { error: parsed.error };
+
+  await createMoodLog(parsed.data);
+  refresh();
+  return { ok: "Registro guardado." };
+}
+
+export async function deleteMoodAction(formData: FormData): Promise<void> {
+  await requireSession();
+  const id = Number(formData.get("id"));
+  if (Number.isInteger(id)) {
+    await deleteMoodLog(id);
+    refresh();
+  }
+}
+
+/* ------------------------------ ajustes -------------------------------- */
+
+export async function saveHeightAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  await requireSession();
+  const raw = String(formData.get("heightCm") ?? "");
+
+  if (raw.trim() === "") {
+    await setSetting(HEIGHT_KEY, null);
+    refresh();
+    revalidatePath("/ajustes");
+    return { ok: "Altura borrada. El IMC deja de mostrarse." };
+  }
+
+  const value = parseHeight(raw);
+  if (value === null) {
+    return {
+      error: `La altura tiene que ser un número entre ${HEIGHT_MIN} y ${HEIGHT_MAX} cm.`,
+    };
+  }
+
+  await setSetting(HEIGHT_KEY, String(value));
+  refresh();
+  revalidatePath("/ajustes");
+  return { ok: "Altura guardada." };
 }
 
 /* ---------------------------- nota del dia ----------------------------- */

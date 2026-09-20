@@ -8,13 +8,23 @@ import { MeasurementFields } from "@/components/MeasurementFields";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
 import { MetricTiles, toTileSeries } from "@/components/MetricTiles";
+import { MoodFields } from "@/components/MoodFields";
+import { MoodList } from "@/components/MoodList";
+import { MoodSummaryCard } from "@/components/MoodSummaryCard";
+import { TagSummary, countTags } from "@/components/TagSummary";
 import { RANGES } from "@/lib/period";
 import { summarizeDayParts } from "@/lib/dayparts";
 import { buildDayMarks, countMeasured, currentStreak } from "@/lib/insights";
 import { latestValues, summarizeDays, type DemoData } from "@/lib/demo-data";
 import { readMeasurementInput } from "@/lib/measurement-input";
+import { readMoodInput, summarizeMood } from "@/lib/mood";
 import { METRICS } from "@/lib/metrics";
-import type { Measurement, MetricValues, NewMeasurement } from "@/lib/model";
+import type {
+  Measurement,
+  MetricValues,
+  MoodLog,
+  NewMeasurement,
+} from "@/lib/model";
 import {
   dayLabel,
   formatDayShort,
@@ -23,12 +33,15 @@ import {
   toTimeKey,
 } from "@/lib/tz";
 
+/** La altura de la persona inventada de la demo, para mostrar el IMC. */
+const DEMO_HEIGHT_CM = 162;
+
 const EMPTY_VALUES = Object.fromEntries(
   METRICS.map((metric) => [metric.key, null]),
 ) as MetricValues;
 
 function toMeasurement(input: NewMeasurement, id: number): Measurement {
-  const { measuredAt, note, ...values } = input;
+  const { measuredAt, note, tags, ...values } = input;
   return {
     ...EMPTY_VALUES,
     ...values,
@@ -37,6 +50,7 @@ function toMeasurement(input: NewMeasurement, id: number): Measurement {
     day: toDayKey(measuredAt),
     time: toTimeKey(measuredAt),
     note,
+    tags,
   };
 }
 
@@ -59,6 +73,7 @@ export function DemoBoard({
 }) {
   const [measurements, setMeasurements] = useState(initial.measurements);
   const [dayNotes, setDayNotes] = useState(initial.dayNotes);
+  const [moods, setMoods] = useState(initial.moods);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -78,7 +93,9 @@ export function DemoBoard({
   const fromDay = shiftDay(today, -(days - 1));
   const rangeSummaries = summaries.filter((summary) => summary.day >= fromDay);
   const rangeMeasurements = measurements.filter((m) => m.day >= fromDay);
+  const rangeMoods = moods.filter((log) => log.day >= fromDay);
 
+  const todayMoods = moods.filter((log) => log.day === today);
   const latest = latestValues(measurements);
   const stripFrom = shiftDay(today, -13);
   const marks = buildDayMarks(stripFrom, today, summaries);
@@ -101,6 +118,13 @@ export function DemoBoard({
     const list = byDay.get(m.day);
     if (list) list.push(m);
     else byDay.set(m.day, [m]);
+  }
+
+  const moodsByDay = new Map<string, MoodLog[]>();
+  for (const log of rangeMoods) {
+    const list = moodsByDay.get(log.day);
+    if (list) list.push(log);
+    else moodsByDay.set(log.day, [log]);
   }
 
   function announce(message: string) {
@@ -160,6 +184,38 @@ export function DemoBoard({
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  function handleMood(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const parsed = readMoodInput(new FormData(form));
+    if ("error" in parsed) {
+      setFlash(null);
+      setError(parsed.error);
+      return;
+    }
+
+    const { loggedAt, ...rest } = parsed.data;
+    const log: MoodLog = {
+      ...rest,
+      id: moods.reduce((max, item) => Math.max(max, item.id), 0) + 1,
+      loggedAt: loggedAt.toISOString(),
+      day: toDayKey(loggedAt),
+      time: toTimeKey(loggedAt),
+    };
+    setMoods((prev) =>
+      [...prev, log].sort((a, b) => (a.loggedAt < b.loggedAt ? -1 : 1)),
+    );
+    form.reset();
+    announce(
+      "Así se registra cómo se sintió. En la app real queda guardado; acá no.",
+    );
+  }
+
+  function handleDeleteMood(id: number) {
+    setMoods((prev) => prev.filter((log) => log.id !== id));
+    announce("Así se borra un registro. Acá vuelve al recargar la página.");
+  }
+
   function handleNote(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const value = String(
@@ -215,6 +271,7 @@ export function DemoBoard({
               idPrefix={`editar-${editing.id}`}
               values={{
                 ...editing,
+                tags: editing.tags,
                 measuredAt: `${editing.day}T${editing.time}`,
               }}
               nowValue={nowValue}
@@ -279,6 +336,7 @@ export function DemoBoard({
           series={toTileSeries([...rangeSummaries].reverse())}
           today={today}
           hrefBase=""
+          heightCm={DEMO_HEIGHT_CM}
         />
       </section>
 
@@ -333,6 +391,32 @@ export function DemoBoard({
           measurements={todayMeasurements}
           onEdit={startEditing}
         />
+      </section>
+
+      <section className="card p-5">
+        <h3 className="mb-1 text-lg font-semibold">¿Cómo se siente?</h3>
+        <p className="mb-4 text-sm text-muted">
+          Lo que no mide ningún aparato. Un mismo 130/85 no es lo mismo con
+          mareo que sin nada.
+        </p>
+
+        <form onSubmit={handleMood} className="space-y-4">
+          <MoodFields
+            idPrefix="demo-animo"
+            nowValue={nowValue}
+            nowText={nowText}
+          />
+          <button type="submit" className="btn-primary w-full sm:w-auto">
+            Guardar cómo se sintió
+          </button>
+        </form>
+
+        {todayMoods.length > 0 ? (
+          <div className="mt-5 border-t border-line pt-4">
+            <h4 className="eyebrow mb-3">Registros de hoy</h4>
+            <MoodList logs={todayMoods} onDelete={handleDeleteMood} />
+          </div>
+        ) : null}
       </section>
 
       <section className="card p-5">
@@ -410,6 +494,8 @@ export function DemoBoard({
         lastPrefix={
           view === "dia" ? "promedio del último día" : "última lectura"
         }
+        heightCm={DEMO_HEIGHT_CM}
+        settingsHref={null}
       />
 
       <section className="card p-5">
@@ -421,6 +507,24 @@ export function DemoBoard({
           Todo junto en un solo número esa diferencia se pierde.
         </p>
         <DayPartPattern parts={summarizeDayParts(rangeMeasurements)} />
+      </section>
+
+      <section className="card p-5">
+        <h3 className="mb-1 text-lg font-semibold">Etiquetas</h3>
+        <p className="mb-3 text-sm text-muted">
+          En qué contexto se midió. Una presión en reposo y otra después de
+          caminar no se leen igual.
+        </p>
+        <TagSummary counts={countTags(rangeMeasurements)} />
+      </section>
+
+      <section className="card p-5">
+        <h3 className="mb-1 text-lg font-semibold">Cómo se sintió</h3>
+        <p className="mb-3 text-sm text-muted">
+          El promedio del período, día por día, y los síntomas que se
+          repitieron.
+        </p>
+        <MoodSummaryCard summary={summarizeMood(rangeMoods)} />
       </section>
 
       <section className="card p-5">
@@ -451,6 +555,16 @@ export function DemoBoard({
                     measurements={byDay.get(summary.day) ?? []}
                     onEdit={startEditing}
                   />
+
+                  {moodsByDay.get(summary.day)?.length ? (
+                    <div className="mt-3 border-t border-line pt-3">
+                      <p className="eyebrow mb-2">Cómo se sintió</p>
+                      <MoodList
+                        logs={moodsByDay.get(summary.day) ?? []}
+                        onDelete={handleDeleteMood}
+                      />
+                    </div>
+                  ) : null}
                   {summary.note ? (
                     <p className="mt-3 border-t border-line pt-3 text-sm">
                       <span className="font-medium">Nota del día: </span>

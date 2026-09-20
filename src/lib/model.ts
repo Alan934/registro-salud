@@ -10,6 +10,8 @@ export type Measurement = MetricValues & {
   day: string;
   time: string;
   note: string | null;
+  /** Ids del catalogo de tags.ts. Vacio si la toma no tiene ninguna. */
+  tags: string[];
 };
 
 export type DaySummary = MetricValues & {
@@ -26,7 +28,28 @@ export type LatestValue = {
   time: string;
 };
 
+/** Un registro de como se sintio: puntaje, sintomas y nota. */
+export type MoodLog = {
+  id: number;
+  loggedAt: string;
+  day: string;
+  time: string;
+  /** De 0 a 10. */
+  mood: number;
+  /** Ids del catalogo de mood.ts. */
+  symptoms: string[];
+  note: string | null;
+};
+
+export type NewMoodLog = {
+  loggedAt: Date;
+  mood: number;
+  symptoms: string[];
+  note: string | null;
+};
+
 export type NewMeasurement = {
   measuredAt: Date;
   note: string | null;
+  tags: string[];
 } & Partial<MetricValues>;
