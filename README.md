@@ -19,7 +19,10 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
 - **Métricas**: gráficos por período (7 / 30 / 90 días / 1 año) con dos vistas,
   *Por día* (promedios) y *Cada toma* (valor por valor). Abajo, el detalle de
   cada día se despliega para ver toma por toma, con su hora, su observación y
-  botón para editar o borrar.
+  botón para editar o borrar. Las tomas de cada día se piden recién al
+  desplegarlo ([/api/dia/[day]](src/app/api/dia/[day]/route.ts)): con un año
+  de datos son miles, y mandarlas todas de entrada para que queden escondidas
+  atrás de un desplegable cerrado es puro peso.
 - **Nota del día**: un campo libre por fecha para lo que no es un número
   (cómo se sintió, qué comió, medicación, turnos). Un día puede tener sólo
   nota, sin ninguna toma.
@@ -126,6 +129,7 @@ src/
       page.tsx        Hoy: cargar toma, promedio del día, nota del día
       metricas/       gráficos, promedios diarios y detalle por horario
       toma/[id]/      editar o borrar una toma
+    api/dia/[day]/    las tomas de un día, para el detalle desplegable
     api/metricas/pdf/ el informe del período, para descargar o compartir
     login/            ingreso con usuario y contraseña
     demo/             página pública de ejemplo, sin acceso a la base
@@ -135,7 +139,8 @@ src/
   lib/
     actions.ts        server actions (validación incluida)
     auth.ts           credenciales y cookie de sesión
-    queries.ts        acceso a la base
+    queries.ts        acceso a la base (los rangos filtran por measured_at,
+                      no por la fecha local calculada, para usar el índice)
     metrics.ts        definición de cada métrica y sus rangos
     period.ts         el período mirado: atajos y fechas a mano
     trends.ts         comparación contra el período anterior

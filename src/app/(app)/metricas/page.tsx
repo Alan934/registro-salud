@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
+import { DayDetail } from "@/components/DayDetail";
 import { ExportButtons } from "@/components/ExportButtons";
-import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
 import { PeriodControls } from "@/components/PeriodControls";
 import { TrendList } from "@/components/TrendList";
-import type { Measurement } from "@/lib/model";
 import { periodQuery, previousPeriod, resolvePeriod } from "@/lib/period";
 import { reportFileName } from "@/lib/pdf";
 import {
@@ -35,10 +34,14 @@ export default async function MetricsPage({
   const { fromDay, toDay } = period;
   const previous = previousPeriod(period);
 
+  // Cada toma por separado sólo hace falta para el gráfico de la vista
+  // "Cada toma". El detalle de cada día lo pide el navegador al desplegarlo.
   const [summaries, measurements, currentAverages, previousAverages] =
     await Promise.all([
       getDaySummaries(fromDay, toDay),
-      getMeasurementsInRange(fromDay, toDay),
+      view === "toma"
+        ? getMeasurementsInRange(fromDay, toDay)
+        : Promise.resolve([]),
       getPeriodAverages(fromDay, toDay),
       getPeriodAverages(previous.fromDay, previous.toDay),
     ]);
@@ -54,13 +57,6 @@ export default async function MetricsPage({
             summary.total > 1 ? `· promedio de ${summary.total} tomas` : "",
         )
       : toChartPoints(measurements, (m) => `${formatDayShort(m.day)} ${m.time}`);
-
-  const byDay = new Map<string, Measurement[]>();
-  for (const m of measurements) {
-    const list = byDay.get(m.day);
-    if (list) list.push(m);
-    else byDay.set(m.day, [m]);
-  }
 
   const query = new URLSearchParams({
     ...Object.fromEntries(
@@ -141,51 +137,30 @@ export default async function MetricsPage({
             <ul className="divide-y divide-line">
               {summaries.map((summary) => (
                 <li key={summary.day} className="py-3 first:pt-0 last:pb-0">
-                  <details>
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="font-medium">
-                          {dayLabel(summary.day)}
-                        </span>
-                        <span className="text-xs text-muted">
-                          {summary.total === 0
-                            ? "sólo nota · ver detalle"
-                            : `${summary.total} ${
-                                summary.total === 1 ? "toma" : "tomas"
-                              } · ver detalle`}
-                        </span>
-                      </div>
-                      {summary.total > 0 ? (
-                        <div className="mt-2">
-                          <MetricChips
-                            values={summary}
-                            counts={summary.counts}
-                          />
-                        </div>
-                      ) : null}
-                    </summary>
-
-                    <div className="mt-3 rounded-xl bg-surface-soft p-3">
-                      {summary.total > 0 ? (
-                        <MeasurementList
-                          measurements={byDay.get(summary.day) ?? []}
-                          backTo={backTo}
-                        />
-                      ) : null}
-                      {summary.note ? (
-                        <p
-                          className={
-                            summary.total > 0
-                              ? "mt-3 border-t border-line pt-3 text-sm"
-                              : "text-sm"
-                          }
-                        >
-                          <span className="font-medium">Nota del día: </span>
-                          <span className="text-muted">{summary.note}</span>
-                        </p>
-                      ) : null}
+                  <DayDetail
+                    day={summary.day}
+                    total={summary.total}
+                    note={summary.note}
+                    backTo={backTo}
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-medium">
+                        {dayLabel(summary.day)}
+                      </span>
+                      <span className="text-xs text-muted">
+                        {summary.total === 0
+                          ? "sólo nota · ver detalle"
+                          : `${summary.total} ${
+                              summary.total === 1 ? "toma" : "tomas"
+                            } · ver detalle`}
+                      </span>
                     </div>
-                  </details>
+                    {summary.total > 0 ? (
+                      <div className="mt-2">
+                        <MetricChips values={summary} counts={summary.counts} />
+                      </div>
+                    ) : null}
+                  </DayDetail>
                 </li>
               ))}
             </ul>

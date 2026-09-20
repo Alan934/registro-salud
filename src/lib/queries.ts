@@ -106,6 +106,21 @@ export async function getMeasurement(id: number): Promise<Measurement | null> {
   return rows[0] ? toMeasurement(rows[0]) : null;
 }
 
+/**
+ * Filtro por rango de dias locales, escrito sobre `measured_at` a secas para
+ * que pueda usar el indice measurements_measured_at_idx.
+ *
+ * Comparar `(measured_at AT TIME ZONE ...)::date` contra la fecha obliga a
+ * calcular la expresion fila por fila y el indice queda afuera; en cambio los
+ * dos extremos del dia local se resuelven una sola vez y la busqueda es por
+ * rango sobre la columna cruda. El limite de arriba es exclusivo: asi entra
+ * todo el ultimo dia sin depender de la hora.
+ */
+function dayRangeFilter(from: string, to: string): string {
+  return `measured_at >= (${from}::date::timestamp AT TIME ZONE '${TIME_ZONE}')
+      AND measured_at <  ((${to}::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}')`;
+}
+
 /** Tomas de un dia puntual, de la mas temprana a la mas tarde. */
 export async function getMeasurementsForDay(
   day: string,
@@ -113,7 +128,7 @@ export async function getMeasurementsForDay(
   const rows = (await sql.query(
     `SELECT ${SELECT_COLUMNS}
        FROM measurements
-      WHERE (measured_at AT TIME ZONE '${TIME_ZONE}')::date = $1::date
+      WHERE ${dayRangeFilter("$1", "$1")}
       ORDER BY measured_at ASC`,
     [day],
   )) as Row[];
@@ -124,6 +139,10 @@ export async function getMeasurementsForDay(
  * Un dia existe si tiene tomas o si tiene nota: por eso el FULL OUTER JOIN.
  * Con un LEFT JOIN desde las tomas, una nota cargada en un dia sin ninguna
  * medicion quedaba guardada pero invisible en la app.
+ *
+ * El rango ($1 y $2) se filtra adentro de cada lado del join, no afuera: si
+ * se filtra despues, Postgres agrupa la tabla entera y recien ahi descarta,
+ * que es justo lo que crece con los anios de uso.
  */
 const DAY_AGGREGATE = `
   SELECT s.* FROM (
@@ -141,9 +160,14 @@ const DAY_AGGREGATE = `
                    `avg(${m.key})::float8 AS avg_${m.key}, count(${m.key})::int AS n_${m.key}`,
                ).join(", ")}
           FROM measurements
+         WHERE ${dayRangeFilter("$1", "$2")}
          GROUP BY 1
       ) d
-      FULL OUTER JOIN daily_notes n ON n.day = d.day::date
+      FULL OUTER JOIN (
+        SELECT day, note
+          FROM daily_notes
+         WHERE day BETWEEN $1::date AND $2::date
+      ) n ON n.day = d.day::date
   ) s
 `;
 
@@ -152,17 +176,16 @@ export async function getDaySummaries(
   fromDay: string,
   toDay: string,
 ): Promise<DaySummary[]> {
-  const rows = (await sql.query(
-    `${DAY_AGGREGATE} WHERE s.day >= $1 AND s.day <= $2 ORDER BY s.day DESC`,
-    [fromDay, toDay],
-  )) as Row[];
+  const rows = (await sql.query(`${DAY_AGGREGATE} ORDER BY s.day DESC`, [
+    fromDay,
+    toDay,
+  ])) as Row[];
   return rows.map(toDaySummary);
 }
 
 export async function getDaySummary(day: string): Promise<DaySummary | null> {
-  const rows = (await sql.query(`${DAY_AGGREGATE} WHERE s.day = $1`, [
-    day,
-  ])) as Row[];
+  // Un solo dia es el rango que empieza y termina en el.
+  const rows = (await sql.query(DAY_AGGREGATE, [day, day])) as Row[];
   return rows[0] ? toDaySummary(rows[0]) : null;
 }
 
@@ -174,7 +197,7 @@ export async function getMeasurementsInRange(
   const rows = (await sql.query(
     `SELECT ${SELECT_COLUMNS}
        FROM measurements
-      WHERE (measured_at AT TIME ZONE '${TIME_ZONE}')::date BETWEEN $1::date AND $2::date
+      WHERE ${dayRangeFilter("$1", "$2")}
       ORDER BY measured_at ASC`,
     [fromDay, toDay],
   )) as Row[];
@@ -211,7 +234,7 @@ export async function getPeriodAverages(
   const rows = (await sql.query(
     `SELECT ${columns}
        FROM measurements
-      WHERE (measured_at AT TIME ZONE '${TIME_ZONE}')::date BETWEEN $1::date AND $2::date`,
+      WHERE ${dayRangeFilter("$1", "$2")}`,
     [fromDay, toDay],
   )) as Row[];
 
