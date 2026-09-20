@@ -77,3 +77,11 @@ export const RANGES = [
   { days: 90, label: "90 días" },
   { days: 365, label: "1 año" },
 ] as const;
+
+export type Range = (typeof RANGES)[number];
+
+/** Lee el parametro "dias" de la URL. Sin valor valido, 30 dias. */
+export function resolveRange(raw: string | undefined): Range {
+  const days = Number(raw);
+  return RANGES.find((range) => range.days === days) ?? RANGES[1];
+}

@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
+import { ExportButtons } from "@/components/ExportButtons";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
-import { RANGES } from "@/lib/chart-groups";
+import { RANGES, resolveRange } from "@/lib/chart-groups";
 import type { Measurement } from "@/lib/model";
+import { reportFileName } from "@/lib/pdf";
 import { getDaySummaries, getMeasurementsInRange } from "@/lib/queries";
 import { dayLabel, formatDayShort, shiftDay, todayKey } from "@/lib/tz";
 
@@ -17,9 +19,7 @@ export default async function MetricsPage({
   searchParams,
 }: PageProps<"/metricas">) {
   const params = await searchParams;
-  const days = RANGES.some((r) => r.days === Number(first(params.dias)))
-    ? Number(first(params.dias))
-    : 30;
+  const days = resolveRange(first(params.dias)).days;
   const view = first(params.vista) === "toma" ? "toma" : "dia";
 
   const toDay = todayKey();
@@ -107,6 +107,15 @@ export default async function MetricsPage({
             </Link>
           ))}
         </div>
+
+        {summaries.length > 0 ? (
+          <div className="ml-auto">
+            <ExportButtons
+              days={days}
+              fileName={reportFileName(fromDay, toDay)}
+            />
+          </div>
+        ) : null}
       </div>
 
       {summaries.length === 0 ? (

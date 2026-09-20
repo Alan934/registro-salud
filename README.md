@@ -21,7 +21,12 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
   cada día se despliega para ver toma por toma, con su hora, su observación y
   botón para editar o borrar.
 - **Nota del día**: un campo libre por fecha para lo que no es un número
-  (cómo se sintió, qué comió, medicación, turnos).
+  (cómo se sintió, qué comió, medicación, turnos). Un día puede tener sólo
+  nota, sin ninguna toma.
+- **Llevar al médico**: en *Métricas* se descarga el período como PDF, con un
+  resumen de promedio, mínimo y máximo por métrica, una fila por día y las
+  notas al final. En el teléfono aparece además *Compartir*, que abre el menú
+  del sistema para mandarlo por WhatsApp, mail o lo que haya instalado.
 - **Rangos de referencia**: los valores fuera del rango habitual se muestran en
   color y los gráficos pintan la franja normal de fondo. Es orientativo, no
   reemplaza al médico.
@@ -97,6 +102,7 @@ src/
       page.tsx        Hoy: cargar toma, promedio del día, nota del día
       metricas/       gráficos, promedios diarios y detalle por horario
       toma/[id]/      editar o borrar una toma
+    api/metricas/pdf/ el informe del período, para descargar o compartir
     login/            ingreso con usuario y contraseña
     demo/             página pública de ejemplo, sin acceso a la base
   components/         formularios, gráficos y piezas de UI
@@ -105,6 +111,7 @@ src/
     auth.ts           credenciales y cookie de sesión
     queries.ts        acceso a la base
     metrics.ts        definición de cada métrica y sus rangos
+    pdf.ts            armado del informe en PDF
     tz.ts             todo lo relativo al horario de Mendoza
   proxy.ts            protege las rutas y redirige al login (deja pasar /demo)
 scripts/init-db.mjs   creación de tablas
