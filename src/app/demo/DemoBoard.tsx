@@ -1,12 +1,17 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { AdherenceStrip } from "@/components/AdherenceStrip";
 import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
+import { DayPartPattern } from "@/components/DayPartPattern";
 import { MeasurementFields } from "@/components/MeasurementFields";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
+import { MetricTiles, toTileSeries } from "@/components/MetricTiles";
 import { RANGES } from "@/lib/period";
-import { summarizeDays, type DemoData } from "@/lib/demo-data";
+import { summarizeDayParts } from "@/lib/dayparts";
+import { buildDayMarks, countMeasured, currentStreak } from "@/lib/insights";
+import { latestValues, summarizeDays, type DemoData } from "@/lib/demo-data";
 import { readMeasurementInput } from "@/lib/measurement-input";
 import { METRICS } from "@/lib/metrics";
 import type { Measurement, MetricValues, NewMeasurement } from "@/lib/model";
@@ -73,6 +78,10 @@ export function DemoBoard({
   const fromDay = shiftDay(today, -(days - 1));
   const rangeSummaries = summaries.filter((summary) => summary.day >= fromDay);
   const rangeMeasurements = measurements.filter((m) => m.day >= fromDay);
+
+  const latest = latestValues(measurements);
+  const stripFrom = shiftDay(today, -13);
+  const marks = buildDayMarks(stripFrom, today, summaries);
 
   const points =
     view === "dia"
@@ -249,6 +258,30 @@ export function DemoBoard({
         <h2 className="text-2xl font-semibold">Hoy</h2>
       </div>
 
+      <section className="card p-5">
+        <h3 className="eyebrow mb-3">Constancia · últimos 14 días</h3>
+        <AdherenceStrip
+          marks={marks}
+          measured={countMeasured(marks)}
+          total={marks.length}
+          streak={currentStreak(summaries, today)}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <h3 className="text-lg font-semibold">Tus categorías</h3>
+        <p className="text-sm text-muted">
+          El último valor de cada una y en qué zona quedó. Tocá una para ir a su
+          gráfico.
+        </p>
+        <MetricTiles
+          latest={latest}
+          series={toTileSeries([...rangeSummaries].reverse())}
+          today={today}
+          hrefBase=""
+        />
+      </section>
+
       {!editing ? (
         <section className="card p-5 shadow-sm">
           <h3 className="mb-4 text-lg font-semibold">Cargar una toma</h3>
@@ -372,7 +405,23 @@ export function DemoBoard({
         </div>
       </div>
 
-      <ChartGrid points={points} />
+      <ChartGrid
+        points={points}
+        lastPrefix={
+          view === "dia" ? "promedio del último día" : "última lectura"
+        }
+      />
+
+      <section className="card p-5">
+        <h3 className="mb-1 text-lg font-semibold">
+          Patrón por momento del día
+        </h3>
+        <p className="mb-3 text-sm text-muted">
+          El promedio de la mañana, de la tarde y de la noche por separado.
+          Todo junto en un solo número esa diferencia se pierde.
+        </p>
+        <DayPartPattern parts={summarizeDayParts(rangeMeasurements)} />
+      </section>
 
       <section className="card p-5">
         <h3 className="mb-1 text-lg font-semibold">Detalle por día</h3>

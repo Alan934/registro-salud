@@ -22,6 +22,9 @@
   --warn-soft: #fdf1df;
   --ok: #1d6b3f;
   --ok-soft: #e6f4ea;
+  /* "Por debajo de lo habitual": ni alarma ni normal, por eso azul. */
+  --info: #1a5fa8;
+  --info-soft: #e7eff9;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,6 +45,8 @@
     --warn-soft: #33281a;
     --ok: #7fc99a;
     --ok-soft: #1c2f22;
+    --info: #7db3f0;
+    --info-soft: #17273a;
   }
 }
 
@@ -61,6 +66,8 @@
   --color-warn-soft: var(--warn-soft);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
   --font-sans: var(--font-sans-app);
 }
 
@@ -98,6 +105,40 @@ body {
   .card {
     @apply rounded-2xl border border-line bg-surface;
   }
+
+  /*
+    Pastilla de estado ("Normal", "Alta", "Baja"). El color dice en que zona
+    del rango de referencia cayo el valor; el texto lo dice igual, sin color.
+  */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1
+           text-xs font-semibold whitespace-nowrap;
+  }
+  .pill-ok {
+    @apply bg-ok-soft text-ok;
+  }
+  .pill-warn {
+    @apply bg-warn-soft text-warn;
+  }
+  .pill-high {
+    @apply bg-danger-soft text-danger;
+  }
+  .pill-low {
+    @apply bg-info-soft text-info;
+  }
+  .pill-neutral {
+    @apply bg-surface-soft text-muted;
+  }
+
+  /* Titulito de seccion chica: "ADHERENCIA", "PATRON DEL DIA". */
+  .eyebrow {
+    @apply text-xs font-semibold tracking-wide text-muted uppercase;
+  }
+}
+
+/* La barra de navegacion de abajo no se mete bajo el gesto del telefono. */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* El icono nativo del datetime-local casi no se ve en modo oscuro. */
@@ -108,49 +149,62 @@ body {
 }
 
 /*
-  Colores de las series de los graficos. Cada tarjeta se envuelve en una de
-  estas clases y el grafico usa var(--series) / var(--series-2), asi el modo
-  oscuro se resuelve en CSS y no con JavaScript.
+  Color de cada metrica. Cada tarjeta se envuelve en una de estas clases y
+  adentro se usa var(--series) / var(--series-2) para la linea del grafico y
+  var(--series-soft) para el fondo del icono, asi el modo oscuro se resuelve
+  en CSS y no con JavaScript.
   Pasos validados para cada superficie (claro #ffffff / oscuro #1d1f19).
 */
 .series-pressure {
   --series: #e34948;
   --series-2: #2a78d6;
+  --series-soft: #fdecec;
 }
 .series-pulse {
   --series: #e87ba4;
+  --series-soft: #fdeef4;
 }
 .series-spo2 {
   --series: #008300;
+  --series-soft: #e6f3e6;
 }
 .series-glucose {
   --series: #eb6834;
+  --series-soft: #fdeee6;
 }
 .series-weight {
   --series: #4a3aa7;
+  --series-soft: #eeecfa;
 }
 .series-temperature {
   --series: #eda100;
+  --series-soft: #fdf3de;
 }
 
 @media (prefers-color-scheme: dark) {
   .series-pressure {
     --series: #e66767;
     --series-2: #3987e5;
+    --series-soft: #2e1c1c;
   }
   .series-pulse {
     --series: #d55181;
+    --series-soft: #2d1a22;
   }
   .series-spo2 {
     --series: #4fa85f;
+    --series-soft: #18291a;
   }
   .series-glucose {
     --series: #d95926;
+    --series-soft: #2c1d16;
   }
   .series-weight {
     --series: #9085e9;
+    --series-soft: #1f1d33;
   }
   .series-temperature {
     --series: #c98500;
+    --series-soft: #2a2213;
   }
 }

@@ -1,22 +1,16 @@
-import {
-  METRICS,
-  formatValue,
-  statusFor,
-  type MetricKey,
-} from "@/lib/metrics";
-
-const STATUS_CLASS = {
-  ok: "bg-surface-soft text-fg",
-  low: "bg-warn-soft text-warn",
-  high: "bg-danger-soft text-danger",
-  none: "bg-surface-soft text-fg",
-} as const;
+import { METRICS, formatValue, type MetricKey } from "@/lib/metrics";
+import { TONE_PILL, worstTone, zoneFor, type ZoneTone } from "@/lib/zones";
 
 type Values = Partial<Record<MetricKey, number | null>>;
 
 /**
  * Fila compacta de valores. La presión se muestra como "120/80" porque
  * es como se lee en el tensiómetro.
+ *
+ * El color sale de la zona de referencia (normal / elevada / alta), así una
+ * lectura alta se ve distinta de una apenas elevada. El nombre de la zona va
+ * en el title y en el texto para lectores de pantalla: el color solo no
+ * alcanza para contarlo.
  */
 export function MetricChips({
   values,
@@ -29,14 +23,14 @@ export function MetricChips({
 
   const { systolic, diastolic } = values;
   if (systolic != null || diastolic != null) {
-    const parts = [
-      statusFor("systolic", systolic ?? null),
-      statusFor("diastolic", diastolic ?? null),
+    const zones = [
+      zoneFor("systolic", systolic ?? null),
+      zoneFor("diastolic", diastolic ?? null),
     ];
-    let status: keyof typeof STATUS_CLASS = "ok";
-    if (systolic == null || diastolic == null) status = "none";
-    else if (parts.includes("high")) status = "high";
-    else if (parts.includes("low")) status = "low";
+    const tone = worstTone(zones.flatMap((zone) => (zone ? [zone.tone] : [])));
+    const zoneLabel = tone
+      ? (zones.find((zone) => zone?.tone === tone)?.label ?? null)
+      : null;
 
     chips.push(
       <Chip
@@ -47,7 +41,8 @@ export function MetricChips({
           diastolic ?? null,
         )}`}
         unit="mmHg"
-        status={status}
+        tone={tone}
+        zoneLabel={zoneLabel}
         count={counts?.systolic}
       />,
     );
@@ -57,13 +52,15 @@ export function MetricChips({
     if (metric.key === "systolic" || metric.key === "diastolic") continue;
     const value = values[metric.key];
     if (value == null) continue;
+    const zone = zoneFor(metric.key, value);
     chips.push(
       <Chip
         key={metric.key}
         label={metric.short}
         value={formatValue(metric.key, value)}
         unit={metric.unit}
-        status={statusFor(metric.key, value) ?? "none"}
+        tone={zone?.tone ?? null}
+        zoneLabel={zone?.label ?? null}
         count={counts?.[metric.key]}
       />,
     );
@@ -73,31 +70,46 @@ export function MetricChips({
     return <p className="text-sm text-muted">Sin valores cargados.</p>;
   }
 
-  return <div className="flex flex-wrap gap-2">{chips}</div>;
+  return <div className="flex flex-wrap gap-1.5">{chips}</div>;
 }
+
+/** Un valor "dentro de rango" no necesita color: se destaca lo que se sale. */
+const TONE_CLASS: Record<ZoneTone, string> = {
+  ...TONE_PILL,
+  ok: "bg-surface-soft text-fg",
+};
 
 function Chip({
   label,
   value,
   unit,
-  status,
+  tone,
+  zoneLabel,
   count,
 }: {
   label: string;
   value: string;
   unit: string;
-  status: keyof typeof STATUS_CLASS;
+  tone: ZoneTone | null;
+  zoneLabel: string | null;
   count?: number;
 }) {
+  const showZone = zoneLabel !== null && tone !== null && tone !== "ok";
+
   return (
     <span
-      className={`inline-flex items-baseline gap-1.5 rounded-lg px-2.5 py-1.5 text-sm ${STATUS_CLASS[status]}`}
+      title={zoneLabel ? `${label}: ${zoneLabel.toLowerCase()}` : undefined}
+      className={`inline-flex items-baseline gap-1.5 rounded-full px-2.5 py-1 text-sm
+                  ${tone ? TONE_CLASS[tone] : "bg-surface-soft text-fg"}`}
     >
-      <span className="text-xs text-muted">{label}</span>
+      <span className="text-xs opacity-75">{label}</span>
       <strong className="font-semibold tabular-nums">{value}</strong>
-      <span className="text-xs text-muted">{unit}</span>
+      <span className="text-xs opacity-75">{unit}</span>
+      {showZone ? (
+        <span className="text-xs font-medium">· {zoneLabel.toLowerCase()}</span>
+      ) : null}
       {count && count > 1 ? (
-        <span className="text-xs text-muted">· prom. de {count}</span>
+        <span className="text-xs opacity-75">· prom. de {count}</span>
       ) : null}
     </span>
   );

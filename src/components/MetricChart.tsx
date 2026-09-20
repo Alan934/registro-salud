@@ -1,5 +1,6 @@
 "use client";
 
+import type { MetricKey } from "@/lib/metrics";
 import {
   CartesianGrid,
   Line,
@@ -13,7 +14,7 @@ import {
 
 export type ChartSeries = {
   /** Clave dentro de cada punto. */
-  key: string;
+  key: MetricKey;
   label: string;
   /** Variable CSS con el color, definida en globals.css. */
   colorVar: "--series" | "--series-2";

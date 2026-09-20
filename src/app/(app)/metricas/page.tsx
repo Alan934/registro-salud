@@ -1,21 +1,28 @@
 import Link from "next/link";
+import { AdherenceStrip } from "@/components/AdherenceStrip";
 import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
 import { DayDetail } from "@/components/DayDetail";
+import { DayPartPattern } from "@/components/DayPartPattern";
 import { ExportButtons } from "@/components/ExportButtons";
 import { MetricChips } from "@/components/MetricChips";
 import { PeriodControls } from "@/components/PeriodControls";
 import { TrendList } from "@/components/TrendList";
+import { buildDayMarks, countMeasured, currentStreak } from "@/lib/insights";
 import { periodQuery, previousPeriod, resolvePeriod } from "@/lib/period";
 import { reportFileName } from "@/lib/pdf";
 import {
+  getDayPartAverages,
   getDaySummaries,
   getMeasurementsInRange,
   getPeriodAverages,
 } from "@/lib/queries";
 import { buildTrends } from "@/lib/trends";
-import { dayLabel, formatDayShort } from "@/lib/tz";
+import { dayLabel, formatDayShort, todayKey } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
+
+/** Cuantos cuadraditos entran en la tira de constancia sin volverse una mancha. */
+const STRIP_MAX_DAYS = 60;
 
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -33,10 +40,11 @@ export default async function MetricsPage({
   const view = first(params.vista) === "toma" ? "toma" : "dia";
   const { fromDay, toDay } = period;
   const previous = previousPeriod(period);
+  const today = todayKey();
 
   // Cada toma por separado sólo hace falta para el gráfico de la vista
   // "Cada toma". El detalle de cada día lo pide el navegador al desplegarlo.
-  const [summaries, measurements, currentAverages, previousAverages] =
+  const [summaries, measurements, currentAverages, previousAverages, dayParts] =
     await Promise.all([
       getDaySummaries(fromDay, toDay),
       view === "toma"
@@ -44,6 +52,7 @@ export default async function MetricsPage({
         : Promise.resolve([]),
       getPeriodAverages(fromDay, toDay),
       getPeriodAverages(previous.fromDay, previous.toDay),
+      getDayPartAverages(fromDay, toDay),
     ]);
 
   const trends = buildTrends(currentAverages, previousAverages);
@@ -57,6 +66,10 @@ export default async function MetricsPage({
             summary.total > 1 ? `· promedio de ${summary.total} tomas` : "",
         )
       : toChartPoints(measurements, (m) => `${formatDayShort(m.day)} ${m.time}`);
+
+  // Un cuadradito por día del período; si son muchos se dibujan los últimos.
+  const allMarks = buildDayMarks(fromDay, toDay, summaries);
+  const marks = allMarks.slice(-STRIP_MAX_DAYS);
 
   const query = new URLSearchParams({
     ...Object.fromEntries(
@@ -107,14 +120,51 @@ export default async function MetricsPage({
             />
           </div>
 
+          <ChartGrid
+            points={points}
+            lastPrefix={
+              view === "dia" ? "promedio del último día" : "última lectura"
+            }
+          />
+
+          <section className="card p-5">
+            <h2 className="mb-1 text-lg font-semibold">
+              Patrón por momento del día
+            </h2>
+            <p className="mb-3 text-sm text-muted">
+              El promedio de la mañana, de la tarde y de la noche por separado.
+              Todo junto en un solo número esa diferencia se pierde.
+            </p>
+            <DayPartPattern parts={dayParts} />
+          </section>
+
+          <section className="card p-5">
+            <h2 className="mb-1 text-lg font-semibold">Constancia</h2>
+            <p className="mb-3 text-sm text-muted">
+              Qué días del período quedaron registrados y cuáles no.
+            </p>
+            <AdherenceStrip
+              marks={marks}
+              measured={countMeasured(allMarks)}
+              total={allMarks.length}
+              streak={
+                toDay === today ? currentStreak(summaries, today) : undefined
+              }
+              caption={
+                allMarks.length > marks.length
+                  ? `La tira muestra los últimos ${marks.length} días del período.`
+                  : undefined
+              }
+            />
+          </section>
+
           <section className="card p-5">
             <h2 className="mb-1 text-lg font-semibold">
               Comparado con el período anterior
             </h2>
             <p className="mb-3 text-sm text-muted">
-              Contra los {period.days}{" "}
-              {period.days === 1 ? "día" : "días"} de antes (
-              {formatDayShort(previous.fromDay)} al{" "}
+              Contra los {period.days} {period.days === 1 ? "día" : "días"} de
+              antes ({formatDayShort(previous.fromDay)} al{" "}
               {formatDayShort(previous.toDay)}). La flecha indica en qué
               dirección cambió el promedio.
             </p>
@@ -125,8 +175,6 @@ export default async function MetricsPage({
               )}`}
             />
           </section>
-
-          <ChartGrid points={points} />
 
           <section className="card p-5">
             <h2 className="mb-1 text-lg font-semibold">Detalle por día</h2>

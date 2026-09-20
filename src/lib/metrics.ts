@@ -125,15 +125,3 @@ export function formatValue(key: MetricKey, value: number | null): string {
   if (value === null || Number.isNaN(value)) return "-";
   return value.toFixed(METRIC_BY_KEY[key].decimals);
 }
-
-/** "dentro" | "bajo" | "alto" | null si la metrica no tiene rango. */
-export function statusFor(
-  key: MetricKey,
-  value: number | null,
-): "ok" | "low" | "high" | null {
-  const normal = METRIC_BY_KEY[key].normal;
-  if (!normal || value === null) return null;
-  if (value < normal[0]) return "low";
-  if (value > normal[1]) return "high";
-  return "ok";
-}

@@ -19,6 +19,13 @@ export type DaySummary = MetricValues & {
   note: string | null;
 };
 
+/** Ultimo valor cargado de una metrica, con cuando fue. */
+export type LatestValue = {
+  value: number;
+  day: string;
+  time: string;
+};
+
 export type NewMeasurement = {
   measuredAt: Date;
   note: string | null;

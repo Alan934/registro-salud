@@ -10,6 +10,10 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
 
 ## Cómo funciona
 
+- **Pantalla *Hoy***: arriba, la fecha, el resumen del día y el botón para
+  cargar. Debajo, *Tus categorías*: una baldosa por métrica con el último
+  valor, en qué zona quedó y cómo viene la línea de los últimos días. Cada
+  baldosa lleva al gráfico de esa métrica.
 - **Cargar una toma**: en la pantalla *Hoy* se completa solo lo que se midió.
   Se guarda con la fecha y hora del momento; si hace falta cargar un día
   anterior, se abre *Fecha y hora* y se elige otra.
@@ -37,9 +41,25 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
   se muestra en qué dirección se movió el promedio de cada métrica. La flecha
   dice la dirección, no si está bien o mal: bajar de peso y bajar el oxígeno
   en sangre no significan lo mismo.
-- **Rangos de referencia**: los valores fuera del rango habitual se muestran en
-  color y los gráficos pintan la franja normal de fondo. Es orientativo, no
-  reemplaza al médico.
+- **Zonas de referencia**: cada valor viene con una barra que muestra los
+  tramos de la métrica (baja / normal / elevada / alta) y un marcador donde
+  cayó la lectura, más una pastilla que lo dice con palabras. Los gráficos
+  pintan además la franja normal de fondo. Los cortes están en
+  [zones.ts](src/lib/zones.ts) y son orientativos: no reemplazan al médico.
+- **Constancia**: una tira con un cuadradito por día muestra qué días quedaron
+  registrados y cuáles no, con el total del período y cuántos días seguidos se
+  viene midiendo. Los huecos son lo primero que se pregunta al mirar un
+  promedio.
+- **Patrón por momento del día**: el promedio de la mañana, de la tarde y de la
+  noche por separado ([dayparts.ts](src/lib/dayparts.ts)). Todo junto en un
+  solo número esa diferencia se pierde, y es justo lo que se mira cuando la
+  presión sube siempre a la misma hora.
+
+## En el teléfono
+
+Las dos pantallas y el botón de cargar viven en una barra fija abajo, al
+alcance del pulgar. En pantalla grande esa barra no aparece: la navegación
+queda en el encabezado.
 
 ## Instalarla en el teléfono
 
@@ -138,6 +158,9 @@ src/
   components/         formularios, gráficos y piezas de UI
   lib/
     actions.ts        server actions (validación incluida)
+    zones.ts          tramos de referencia de cada métrica (la barra de colores)
+    insights.ts       constancia: días registrados y racha
+    dayparts.ts       mañana / tarde / noche (en SQL y en la demo)
     auth.ts           credenciales y cookie de sesión
     queries.ts        acceso a la base (los rangos filtran por measured_at,
                       no por la fecha local calculada, para usar el índice)

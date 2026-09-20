@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { BottomNav } from "@/components/BottomNav";
 import { Logo } from "@/components/Logo";
 import { NavLink } from "@/components/NavLink";
 import { logoutAction } from "@/lib/actions";
@@ -14,14 +15,17 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <header className="sticky top-0 z-10 border-b border-line bg-page/85 backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
           <Link href="/" className="flex items-center gap-2 font-semibold">
-            <Logo className="h-7 w-7 shrink-0" />
+            <Logo className="h-8 w-8 shrink-0" />
             <span className="hidden sm:inline">Registro de Salud</span>
             <span className="sm:hidden">Registro</span>
           </Link>
 
           <nav className="ml-auto flex items-center gap-1">
-            <NavLink href="/">Hoy</NavLink>
-            <NavLink href="/metricas">Métricas</NavLink>
+            {/* En telefono estas dos pantallas estan en la barra de abajo. */}
+            <span className="hidden items-center gap-1 sm:flex">
+              <NavLink href="/">Hoy</NavLink>
+              <NavLink href="/metricas">Métricas</NavLink>
+            </span>
             <form action={logoutAction}>
               <button
                 type="submit"
@@ -39,10 +43,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         {children}
       </main>
 
-      <footer className="px-4 pb-6 text-center text-xs text-muted">
+      <footer className="px-4 pb-28 text-center text-xs text-muted sm:pb-6">
         Horario de Mendoza, Argentina · Los rangos de referencia son
         orientativos, no reemplazan al médico.
       </footer>
+
+      <BottomNav />
     </div>
   );
 }

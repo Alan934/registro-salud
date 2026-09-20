@@ -3,7 +3,11 @@ import { MetricChips } from "@/components/MetricChips";
 import type { Measurement } from "@/lib/model";
 import { formatDayShort } from "@/lib/tz";
 
-/** Lista de tomas individuales, cada una con su horario. */
+/**
+ * Lista de tomas individuales, cada una con su horario. Se dibuja como una
+ * línea de tiempo: el día se lee de arriba abajo y se ve de un vistazo a qué
+ * hora se midió y a qué hora no.
+ */
 export function MeasurementList({
   measurements,
   showDay = false,
@@ -23,43 +27,52 @@ export function MeasurementList({
   }
 
   return (
-    <ul className="divide-y divide-line">
+    <ul className="ml-1.5 space-y-4 border-l border-line pl-5">
       {measurements.map((m) => (
-        <li key={m.id} className="flex gap-3 py-3 first:pt-0 last:pb-0">
-          <div className="w-14 shrink-0 pt-0.5">
-            <div className="font-semibold tabular-nums">{m.time}</div>
-            {showDay ? (
-              <div className="text-xs text-muted tabular-nums">
-                {formatDayShort(m.day)}
+        <li key={m.id} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute top-1.5 -left-[26px] h-3 w-3 rounded-full
+                       border-2 border-surface bg-accent"
+          />
+
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className="flex items-baseline gap-2">
+                <span className="font-semibold tabular-nums">{m.time}</span>
+                {showDay ? (
+                  <span className="text-xs text-muted tabular-nums">
+                    {formatDayShort(m.day)}
+                  </span>
+                ) : null}
               </div>
-            ) : null}
-          </div>
 
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <MetricChips values={m} />
-            {m.note ? (
-              <p className="text-sm text-muted break-words">{m.note}</p>
-            ) : null}
-          </div>
+              <MetricChips values={m} />
 
-          {onEdit ? (
-            <button
-              type="button"
-              onClick={() => onEdit(m.id)}
-              className="shrink-0 self-start rounded-lg px-2 py-1 text-sm text-muted
-                         transition hover:bg-surface-soft hover:text-fg"
-            >
-              Editar
-            </button>
-          ) : (
-            <Link
-              href={{ pathname: `/toma/${m.id}`, query: { volver: backTo } }}
-              className="shrink-0 self-start rounded-lg px-2 py-1 text-sm text-muted
-                         transition hover:bg-surface-soft hover:text-fg"
-            >
-              Editar
-            </Link>
-          )}
+              {m.note ? (
+                <p className="text-sm break-words text-muted">{m.note}</p>
+              ) : null}
+            </div>
+
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={() => onEdit(m.id)}
+                className="shrink-0 rounded-lg px-2 py-1 text-sm text-muted
+                           transition hover:bg-surface-soft hover:text-fg"
+              >
+                Editar
+              </button>
+            ) : (
+              <Link
+                href={{ pathname: `/toma/${m.id}`, query: { volver: backTo } }}
+                className="shrink-0 rounded-lg px-2 py-1 text-sm text-muted
+                           transition hover:bg-surface-soft hover:text-fg"
+              >
+                Editar
+              </Link>
+            )}
+          </div>
         </li>
       ))}
     </ul>

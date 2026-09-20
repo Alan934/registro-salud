@@ -1,15 +1,23 @@
 import "server-only";
+import { DAY_PARTS, type DayPartId, type DayPartSummary } from "@/lib/dayparts";
 import { sql } from "@/lib/db";
 import { METRICS, type MetricKey } from "@/lib/metrics";
 import type {
   DaySummary,
+  LatestValue,
   Measurement,
   MetricValues,
   NewMeasurement,
 } from "@/lib/model";
 import { TIME_ZONE } from "@/lib/tz";
 
-export type { DaySummary, Measurement, MetricValues, NewMeasurement };
+export type {
+  DaySummary,
+  LatestValue,
+  Measurement,
+  MetricValues,
+  NewMeasurement,
+};
 
 type Row = Record<string, unknown>;
 
@@ -183,12 +191,6 @@ export async function getDaySummaries(
   return rows.map(toDaySummary);
 }
 
-export async function getDaySummary(day: string): Promise<DaySummary | null> {
-  // Un solo dia es el rango que empieza y termina en el.
-  const rows = (await sql.query(DAY_AGGREGATE, [day, day])) as Row[];
-  return rows[0] ? toDaySummary(rows[0]) : null;
-}
-
 /** Todas las tomas de un rango, para ver el detalle por horario. */
 export async function getMeasurementsInRange(
   fromDay: string,
@@ -250,12 +252,6 @@ export async function getPeriodAverages(
   return averages;
 }
 
-export type LatestValue = {
-  value: number;
-  day: string;
-  time: string;
-};
-
 /** Ultimo valor cargado de cada metrica, para las tarjetas del inicio. */
 export async function getLatestValues(): Promise<
   Partial<Record<MetricKey, LatestValue>>
@@ -284,4 +280,53 @@ export async function getLatestValues(): Promise<
     };
   }
   return result;
+}
+
+/**
+ * Promedios por momento del dia (mañana / tarde / noche) dentro de un rango.
+ * Los cortes salen de DAY_PARTS, la misma definicion que usa la pagina de
+ * ejemplo para calcularlos en el navegador.
+ */
+export async function getDayPartAverages(
+  fromDay: string,
+  toDay: string,
+): Promise<DayPartSummary[]> {
+  const hour = `extract(hour from measured_at AT TIME ZONE '${TIME_ZONE}')`;
+  const cases = DAY_PARTS.slice(1)
+    .map((part, index) => `WHEN ${hour} < ${part.from} THEN '${DAY_PARTS[index].id}'`)
+    .join("\n           ");
+  const columns = METRICS.map(
+    (m) =>
+      `avg(${m.key})::float8 AS avg_${m.key}, count(${m.key})::int AS n_${m.key}`,
+  ).join(", ");
+
+  const rows = (await sql.query(
+    `SELECT CASE
+              ${cases}
+              ELSE '${DAY_PARTS[DAY_PARTS.length - 1].id}'
+            END AS part,
+            count(*)::int AS total,
+            ${columns}
+       FROM measurements
+      WHERE ${dayRangeFilter("$1", "$2")}
+      GROUP BY 1`,
+    [fromDay, toDay],
+  )) as Row[];
+
+  const byPart = new Map<DayPartId, Row>(
+    rows.map((row) => [row.part as DayPartId, row]),
+  );
+
+  // Se devuelven en el orden del dia, no en el que los agrupo Postgres.
+  return DAY_PARTS.flatMap((part) => {
+    const row = byPart.get(part.id);
+    if (!row) return [];
+    const values = Object.fromEntries(
+      METRICS.map((metric) => [metric.key, num(row[`avg_${metric.key}`])]),
+    ) as MetricValues;
+    const counts = Object.fromEntries(
+      METRICS.map((metric) => [metric.key, Number(row[`n_${metric.key}`] ?? 0)]),
+    ) as Record<MetricKey, number>;
+    return [{ ...values, part: part.id, total: Number(row.total ?? 0), counts }];
+  });
 }

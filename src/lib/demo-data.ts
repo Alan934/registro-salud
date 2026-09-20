@@ -1,5 +1,10 @@
 import { METRICS, type MetricKey } from "@/lib/metrics";
-import type { DaySummary, Measurement, MetricValues } from "@/lib/model";
+import type {
+  DaySummary,
+  LatestValue,
+  Measurement,
+  MetricValues,
+} from "@/lib/model";
 import { fromDateTimeLocal, shiftDay } from "@/lib/tz";
 
 /**
@@ -137,4 +142,21 @@ export function summarizeDays(
   }
 
   return summaries.sort((a, b) => (a.day < b.day ? 1 : -1));
+}
+
+/** Ultimo valor de cada metrica, como lo devuelve getLatestValues en la app real. */
+export function latestValues(
+  measurements: Measurement[],
+): Partial<Record<MetricKey, LatestValue>> {
+  const latest: Partial<Record<MetricKey, LatestValue>> = {};
+  // Las tomas vienen de la mas vieja a la mas nueva: la ultima que pise
+  // cada metrica es la que vale.
+  for (const m of measurements) {
+    for (const metric of METRICS) {
+      const value = m[metric.key];
+      if (typeof value !== "number") continue;
+      latest[metric.key] = { value, day: m.day, time: m.time };
+    }
+  }
+  return latest;
 }
