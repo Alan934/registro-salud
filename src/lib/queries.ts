@@ -120,36 +120,31 @@ export async function getMeasurementsForDay(
   return rows.map(toMeasurement);
 }
 
-/** Ultimas tomas cargadas, sin importar el dia. */
-export async function getRecentMeasurements(
-  limit = 10,
-): Promise<Measurement[]> {
-  const rows = (await sql.query(
-    `SELECT ${SELECT_COLUMNS}
-       FROM measurements
-      ORDER BY measured_at DESC
-      LIMIT $1`,
-    [limit],
-  )) as Row[];
-  return rows.map(toMeasurement);
-}
-
+/**
+ * Un dia existe si tiene tomas o si tiene nota: por eso el FULL OUTER JOIN.
+ * Con un LEFT JOIN desde las tomas, una nota cargada en un dia sin ninguna
+ * medicion quedaba guardada pero invisible en la app.
+ */
 const DAY_AGGREGATE = `
-  SELECT d.day,
-         d.total,
-         ${METRICS.map((m) => `d.avg_${m.key}, d.n_${m.key}`).join(", ")},
-         n.note
-    FROM (
-      SELECT to_char(measured_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD') AS day,
-             count(*)::int AS total,
-             ${METRICS.map(
-               (m) =>
-                 `avg(${m.key})::float8 AS avg_${m.key}, count(${m.key})::int AS n_${m.key}`,
-             ).join(", ")}
-        FROM measurements
-       GROUP BY 1
-    ) d
-    LEFT JOIN daily_notes n ON n.day = d.day::date
+  SELECT s.* FROM (
+    SELECT COALESCE(d.day, to_char(n.day, 'YYYY-MM-DD')) AS day,
+           COALESCE(d.total, 0) AS total,
+           ${METRICS.map((m) => `d.avg_${m.key}, COALESCE(d.n_${m.key}, 0) AS n_${m.key}`).join(
+             ", ",
+           )},
+           n.note
+      FROM (
+        SELECT to_char(measured_at AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD') AS day,
+               count(*)::int AS total,
+               ${METRICS.map(
+                 (m) =>
+                   `avg(${m.key})::float8 AS avg_${m.key}, count(${m.key})::int AS n_${m.key}`,
+               ).join(", ")}
+          FROM measurements
+         GROUP BY 1
+      ) d
+      FULL OUTER JOIN daily_notes n ON n.day = d.day::date
+  ) s
 `;
 
 /** Resumen por dia (promedios), del mas reciente al mas viejo. */
@@ -158,14 +153,14 @@ export async function getDaySummaries(
   toDay: string,
 ): Promise<DaySummary[]> {
   const rows = (await sql.query(
-    `${DAY_AGGREGATE} WHERE d.day >= $1 AND d.day <= $2 ORDER BY d.day DESC`,
+    `${DAY_AGGREGATE} WHERE s.day >= $1 AND s.day <= $2 ORDER BY s.day DESC`,
     [fromDay, toDay],
   )) as Row[];
   return rows.map(toDaySummary);
 }
 
 export async function getDaySummary(day: string): Promise<DaySummary | null> {
-  const rows = (await sql.query(`${DAY_AGGREGATE} WHERE d.day = $1`, [
+  const rows = (await sql.query(`${DAY_AGGREGATE} WHERE s.day = $1`, [
     day,
   ])) as Row[];
   return rows[0] ? toDaySummary(rows[0]) : null;
@@ -184,14 +179,6 @@ export async function getMeasurementsInRange(
     [fromDay, toDay],
   )) as Row[];
   return rows.map(toMeasurement);
-}
-
-export async function getDailyNote(day: string): Promise<string | null> {
-  const rows = (await sql.query(
-    `SELECT note FROM daily_notes WHERE day = $1::date`,
-    [day],
-  )) as Row[];
-  return (rows[0]?.note as string | undefined) ?? null;
 }
 
 export async function saveDailyNote(day: string, note: string): Promise<void> {

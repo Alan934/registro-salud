@@ -71,7 +71,7 @@ export default async function MetricsPage({
                 pathname: "/metricas",
                 query: { dias: range.days, vista: view },
               }}
-              aria-current={range.days === days ? "true" : undefined}
+              aria-current={range.days === days ? "page" : undefined}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 range.days === days
                   ? "bg-surface font-medium text-fg shadow-sm"
@@ -96,7 +96,7 @@ export default async function MetricsPage({
                 pathname: "/metricas",
                 query: { dias: days, vista: option.id },
               }}
-              aria-current={option.id === view ? "true" : undefined}
+              aria-current={option.id === view ? "page" : undefined}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 option.id === view
                   ? "bg-surface font-medium text-fg shadow-sm"
@@ -138,22 +138,38 @@ export default async function MetricsPage({
                           {dayLabel(summary.day)}
                         </span>
                         <span className="text-xs text-muted">
-                          {summary.total}{" "}
-                          {summary.total === 1 ? "toma" : "tomas"} · ver detalle
+                          {summary.total === 0
+                            ? "sólo nota · ver detalle"
+                            : `${summary.total} ${
+                                summary.total === 1 ? "toma" : "tomas"
+                              } · ver detalle`}
                         </span>
                       </div>
-                      <div className="mt-2">
-                        <MetricChips values={summary} counts={summary.counts} />
-                      </div>
+                      {summary.total > 0 ? (
+                        <div className="mt-2">
+                          <MetricChips
+                            values={summary}
+                            counts={summary.counts}
+                          />
+                        </div>
+                      ) : null}
                     </summary>
 
                     <div className="mt-3 rounded-xl bg-surface-soft p-3">
-                      <MeasurementList
-                        measurements={byDay.get(summary.day) ?? []}
-                        backTo={backTo}
-                      />
+                      {summary.total > 0 ? (
+                        <MeasurementList
+                          measurements={byDay.get(summary.day) ?? []}
+                          backTo={backTo}
+                        />
+                      ) : null}
                       {summary.note ? (
-                        <p className="mt-3 border-t border-line pt-3 text-sm">
+                        <p
+                          className={
+                            summary.total > 0
+                              ? "mt-3 border-t border-line pt-3 text-sm"
+                              : "text-sm"
+                          }
+                        >
                           <span className="font-medium">Nota del día: </span>
                           <span className="text-muted">{summary.note}</span>
                         </p>
