@@ -26,6 +26,22 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
   color y los gráficos pintan la franja normal de fondo. Es orientativo, no
   reemplaza al médico.
 
+## Página de ejemplo (`/demo`)
+
+`/demo` es la única ruta pública: se entra sin usuario ni contraseña y sirve
+como referencia de cómo funciona la app.
+
+- Los datos son **ficticios**, generados con una semilla fija en
+  [demo-data.ts](src/lib/demo-data.ts). No sale ninguna consulta a la base.
+- Los formularios funcionan de verdad (misma validación que la app real, desde
+  [measurement-input.ts](src/lib/measurement-input.ts)): se puede agregar una
+  toma, editarla y borrarla, y los promedios y gráficos se recalculan.
+- Todo eso vive en el estado del navegador. No hay server actions en esta
+  página, así que **nada se escribe en la base** y al recargar vuelve al punto
+  de partida.
+- La página se marca `noindex` y hay un enlace hacia ella desde la pantalla de
+  ingreso.
+
 ## Configuración
 
 Las variables van en `.env` (hay un `.env.example` de referencia):
@@ -82,6 +98,7 @@ src/
       metricas/       gráficos, promedios diarios y detalle por horario
       toma/[id]/      editar o borrar una toma
     login/            ingreso con usuario y contraseña
+    demo/             página pública de ejemplo, sin acceso a la base
   components/         formularios, gráficos y piezas de UI
   lib/
     actions.ts        server actions (validación incluida)
@@ -89,6 +106,6 @@ src/
     queries.ts        acceso a la base
     metrics.ts        definición de cada métrica y sus rangos
     tz.ts             todo lo relativo al horario de Mendoza
-  proxy.ts            protege las rutas y redirige al login
+  proxy.ts            protege las rutas y redirige al login (deja pasar /demo)
 scripts/init-db.mjs   creación de tablas
 ```

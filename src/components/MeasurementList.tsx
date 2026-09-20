@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MetricChips } from "@/components/MetricChips";
-import type { Measurement } from "@/lib/queries";
+import type { Measurement } from "@/lib/model";
 import { formatDayShort } from "@/lib/tz";
 
 /** Lista de tomas individuales, cada una con su horario. */
@@ -8,15 +8,18 @@ export function MeasurementList({
   measurements,
   showDay = false,
   backTo = "/",
+  onEdit,
+  emptyText = "Todavía no hay tomas cargadas.",
 }: {
   measurements: Measurement[];
   showDay?: boolean;
   backTo?: string;
+  /** Si se pasa, el botón Editar avisa acá en vez de ir a /toma/[id]. */
+  onEdit?: (id: number) => void;
+  emptyText?: string;
 }) {
   if (measurements.length === 0) {
-    return (
-      <p className="text-sm text-muted">Todavía no hay tomas cargadas.</p>
-    );
+    return <p className="text-sm text-muted">{emptyText}</p>;
   }
 
   return (
@@ -39,13 +42,24 @@ export function MeasurementList({
             ) : null}
           </div>
 
-          <Link
-            href={{ pathname: `/toma/${m.id}`, query: { volver: backTo } }}
-            className="shrink-0 self-start rounded-lg px-2 py-1 text-sm text-muted
-                       transition hover:bg-surface-soft hover:text-fg"
-          >
-            Editar
-          </Link>
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={() => onEdit(m.id)}
+              className="shrink-0 self-start rounded-lg px-2 py-1 text-sm text-muted
+                         transition hover:bg-surface-soft hover:text-fg"
+            >
+              Editar
+            </button>
+          ) : (
+            <Link
+              href={{ pathname: `/toma/${m.id}`, query: { volver: backTo } }}
+              className="shrink-0 self-start rounded-lg px-2 py-1 text-sm text-muted
+                         transition hover:bg-surface-soft hover:text-fg"
+            >
+              Editar
+            </Link>
+          )}
         </li>
       ))}
     </ul>

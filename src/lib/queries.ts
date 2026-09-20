@@ -1,24 +1,15 @@
 import "server-only";
 import { sql } from "@/lib/db";
 import { METRICS, type MetricKey } from "@/lib/metrics";
+import type {
+  DaySummary,
+  Measurement,
+  MetricValues,
+  NewMeasurement,
+} from "@/lib/model";
 import { TIME_ZONE } from "@/lib/tz";
 
-export type MetricValues = Record<MetricKey, number | null>;
-
-export type Measurement = MetricValues & {
-  id: number;
-  measuredAt: string;
-  day: string;
-  time: string;
-  note: string | null;
-};
-
-export type DaySummary = MetricValues & {
-  day: string;
-  total: number;
-  counts: Record<MetricKey, number>;
-  note: string | null;
-};
+export type { DaySummary, Measurement, MetricValues, NewMeasurement };
 
 type Row = Record<string, unknown>;
 
@@ -65,11 +56,6 @@ function toDaySummary(row: Row): DaySummary {
     note: (row.note as string | null) ?? null,
   };
 }
-
-export type NewMeasurement = {
-  measuredAt: Date;
-  note: string | null;
-} & Partial<MetricValues>;
 
 export async function createMeasurement(input: NewMeasurement): Promise<void> {
   await sql`

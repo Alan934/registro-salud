@@ -6,8 +6,10 @@ export async function proxy(request: NextRequest) {
   const session = await verifySession(token);
   const { pathname, search } = request.nextUrl;
   const isLogin = pathname === "/login";
+  // La pagina de ejemplo es publica: se mira sin sesion y no toca la base.
+  const isPublic = isLogin || pathname === "/demo";
 
-  if (!session && !isLogin) {
+  if (!session && !isPublic) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { LoginForm } from "./LoginForm";
 
@@ -27,6 +28,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <div className="card p-5 shadow-sm">
           <LoginForm next={next} />
         </div>
+
+        <p className="mt-5 text-center text-sm text-muted">
+          <Link href="/demo" className="text-accent hover:underline">
+            Ver un ejemplo sin entrar
+          </Link>{" "}
+          — datos ficticios, solo para mirar.
+        </p>
       </div>
     </main>
   );
