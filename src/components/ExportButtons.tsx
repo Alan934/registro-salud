@@ -34,13 +34,17 @@ function detectShareSupport(): boolean {
 const subscribe = () => () => {};
 
 export function ExportButtons({
-  days,
+  period,
   fileName,
 }: {
-  days: number;
+  /** Los parámetros que definen el período (`dias`, o `desde` y `hasta`). */
+  period: Record<string, string | number>;
   fileName: string;
 }) {
-  const url = `/api/metricas/pdf?dias=${days}`;
+  const query = new URLSearchParams(
+    Object.entries(period).map(([key, value]) => [key, String(value)]),
+  );
+  const url = `/api/metricas/pdf?${query}`;
   // En el servidor no existe navigator: ahí vale false y se ajusta al hidratar.
   const canShare = useSyncExternalStore(subscribe, detectShareSupport, () => false);
 
@@ -87,7 +91,7 @@ export function ExportButtons({
       await navigator.share({
         files: [file],
         title: "Registro de Salud",
-        text: `Registro de controles — últimos ${days} días.`,
+        text: "Registro de controles.",
       });
     } catch (err) {
       const name = err instanceof Error ? err.name : "";

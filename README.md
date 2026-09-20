@@ -27,9 +27,33 @@ Hecha con **Next.js 16** (App Router + Server Actions), **Tailwind CSS 4**,
   resumen de promedio, mínimo y máximo por métrica, una fila por día y las
   notas al final. En el teléfono aparece además *Compartir*, que abre el menú
   del sistema para mandarlo por WhatsApp, mail o lo que haya instalado.
+- **Período a medida**: además de los atajos (7 / 30 / 90 días / 1 año), en
+  *Otras fechas* se elige un desde y un hasta, por ejemplo para ver lo que
+  pasó entre un turno y el siguiente.
+- **Tendencia**: cada período se compara contra el anterior del mismo largo y
+  se muestra en qué dirección se movió el promedio de cada métrica. La flecha
+  dice la dirección, no si está bien o mal: bajar de peso y bajar el oxígeno
+  en sangre no significan lo mismo.
 - **Rangos de referencia**: los valores fuera del rango habitual se muestran en
   color y los gráficos pintan la franja normal de fondo. Es orientativo, no
   reemplaza al médico.
+
+## Instalarla en el teléfono
+
+La app es una PWA: se instala en la pantalla de inicio y se abre sin la barra
+del navegador, como cualquier otra aplicación.
+
+- **Android (Chrome)**: menú de tres puntos → *Instalar aplicación*.
+- **iPhone (Safari)**: botón de compartir → *Agregar a pantalla de inicio*.
+
+Hace falta que esté servida por **HTTPS** (en Vercel ya lo está); por
+`http://localhost` funciona para probar, pero no desde la IP de la red local.
+
+Sin conexión la app muestra un aviso en vez del error del navegador. Los datos
+no se guardan en el teléfono: son datos de salud y mostrar un valor viejo sería
+peor que no mostrar nada, así que hace falta señal para ver o cargar tomas. El
+service worker ([public/sw.js](public/sw.js)) sólo guarda los archivos
+estáticos de Next, que llevan hash en el nombre.
 
 ## Página de ejemplo (`/demo`)
 
@@ -105,14 +129,19 @@ src/
     api/metricas/pdf/ el informe del período, para descargar o compartir
     login/            ingreso con usuario y contraseña
     demo/             página pública de ejemplo, sin acceso a la base
+    sin-conexion/     aviso que muestra el service worker sin señal
+    manifest.ts       datos de instalación de la PWA
   components/         formularios, gráficos y piezas de UI
   lib/
     actions.ts        server actions (validación incluida)
     auth.ts           credenciales y cookie de sesión
     queries.ts        acceso a la base
     metrics.ts        definición de cada métrica y sus rangos
+    period.ts         el período mirado: atajos y fechas a mano
+    trends.ts         comparación contra el período anterior
     pdf.ts            armado del informe en PDF
     tz.ts             todo lo relativo al horario de Mendoza
-  proxy.ts            protege las rutas y redirige al login (deja pasar /demo)
+  proxy.ts            protege las rutas y redirige al login
+public/sw.js          service worker de la app instalada
 scripts/init-db.mjs   creación de tablas
 ```

@@ -6,8 +6,18 @@ export async function proxy(request: NextRequest) {
   const session = await verifySession(token);
   const { pathname, search } = request.nextUrl;
   const isLogin = pathname === "/login";
-  // La pagina de ejemplo es publica: se mira sin sesion y no toca la base.
-  const isPublic = isLogin || pathname === "/demo";
+  /*
+    Publicas, sin datos de nadie:
+    - /demo, la pagina de ejemplo, que no toca la base;
+    - /sw.js y /sin-conexion, que la app instalada necesita poder bajar
+      aunque la sesion haya vencido (si redirigieran al login, el service
+      worker guardaria el login como pagina de "sin conexion").
+  */
+  const isPublic =
+    isLogin ||
+    pathname === "/demo" ||
+    pathname === "/sw.js" ||
+    pathname === "/sin-conexion";
 
   if (!session && !isPublic) {
     const url = request.nextUrl.clone();

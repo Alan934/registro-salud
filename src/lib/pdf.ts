@@ -9,6 +9,7 @@ import {
 } from "pdf-lib";
 import { METRICS, METRIC_BY_KEY, formatValue, type MetricKey } from "@/lib/metrics";
 import type { DaySummary, Measurement } from "@/lib/model";
+import type { Trend } from "@/lib/trends";
 import { formatDayLong } from "@/lib/tz";
 
 /**
@@ -232,46 +233,61 @@ function statsFor(
   return stats;
 }
 
-const STAT_COLUMNS: Column<{ key: MetricKey; stat: Stat }>[] = [
+type StatRow = { key: MetricKey; stat: Stat; trend?: Trend };
+
+const STAT_COLUMNS: Column<StatRow>[] = [
   {
     header: "Métrica",
     unit: "",
-    width: 150,
+    width: 122,
     align: "left",
     value: ({ key }) => METRIC_BY_KEY[key].label,
   },
   {
     header: "Promedio",
     unit: "",
-    width: 75,
+    width: 66,
     align: "right",
     value: ({ key, stat }) => formatValue(key, stat.avg),
   },
   {
     header: "Mínimo",
     unit: "",
-    width: 70,
+    width: 62,
     align: "right",
     value: ({ key, stat }) => formatValue(key, stat.min),
   },
   {
     header: "Máximo",
     unit: "",
-    width: 70,
+    width: 62,
     align: "right",
     value: ({ key, stat }) => formatValue(key, stat.max),
   },
   {
+    header: "Cambio",
+    // Las flechas no entran en WinAnsi: el signo dice lo mismo.
+    unit: "vs. anterior",
+    width: 72,
+    align: "right",
+    value: ({ key, trend }) => {
+      if (!trend) return "-";
+      if (trend.direction === "flat") return "=";
+      const amount = formatValue(key, Math.abs(trend.delta));
+      return `${trend.delta > 0 ? "+" : "-"}${amount}`;
+    },
+  },
+  {
     header: "Tomas",
     unit: "",
-    width: 55,
+    width: 48,
     align: "right",
     value: ({ stat }) => String(stat.count),
   },
   {
     header: "Referencia",
     unit: "",
-    width: 95,
+    width: 83,
     align: "right",
     value: ({ key }) => {
       const normal = METRIC_BY_KEY[key].normal;
@@ -352,12 +368,24 @@ export type ReportInput = {
   fromDay: string;
   toDay: string;
   rangeLabel: string;
+  /** Cambio de cada métrica contra el período anterior. */
+  trends: Trend[];
+  /** El período con el que se compara, ya escrito ("21/07 al 19/08"). */
+  previousLabel: string;
   generatedAt: Date;
 };
 
 export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
-  const { summaries, measurements, fromDay, toDay, rangeLabel, generatedAt } =
-    input;
+  const {
+    summaries,
+    measurements,
+    fromDay,
+    toDay,
+    rangeLabel,
+    trends,
+    previousLabel,
+    generatedAt,
+  } = input;
   const period = `${formatDayNumeric(fromDay)} al ${formatDayNumeric(toDay)}`;
 
   const doc = await PDFDocument.create();
@@ -385,9 +413,13 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
   canvas.heading("Resumen del período");
 
   const stats = statsFor(measurements);
-  const statRows = METRICS.filter((metric) => stats[metric.key]).map(
-    (metric) => ({ key: metric.key, stat: stats[metric.key] as Stat }),
-  );
+  const statRows: StatRow[] = METRICS.filter(
+    (metric) => stats[metric.key],
+  ).map((metric) => ({
+    key: metric.key,
+    stat: stats[metric.key] as Stat,
+    trend: trends.find((trend) => trend.key === metric.key),
+  }));
 
   if (statRows.length === 0) {
     canvas.draw("No hay mediciones cargadas en este período.", MARGIN, 10, {
@@ -397,6 +429,14 @@ export async function buildReportPdf(input: ReportInput): Promise<Uint8Array> {
   } else {
     canvas.tableHead(STAT_COLUMNS);
     statRows.forEach((row, index) => canvas.tableRow(STAT_COLUMNS, row, index));
+    canvas.move(4);
+    canvas.draw(
+      `"Cambio" es la diferencia del promedio contra el período anterior (${previousLabel}).`,
+      MARGIN,
+      8,
+      { color: MUTED },
+    );
+    canvas.move(12);
   }
 
   /* --------------------------- detalle por dia -------------------------- */

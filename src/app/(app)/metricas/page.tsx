@@ -3,11 +3,18 @@ import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
 import { ExportButtons } from "@/components/ExportButtons";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
-import { RANGES, resolveRange } from "@/lib/chart-groups";
+import { PeriodControls } from "@/components/PeriodControls";
+import { TrendList } from "@/components/TrendList";
 import type { Measurement } from "@/lib/model";
+import { periodQuery, previousPeriod, resolvePeriod } from "@/lib/period";
 import { reportFileName } from "@/lib/pdf";
-import { getDaySummaries, getMeasurementsInRange } from "@/lib/queries";
-import { dayLabel, formatDayShort, shiftDay, todayKey } from "@/lib/tz";
+import {
+  getDaySummaries,
+  getMeasurementsInRange,
+  getPeriodAverages,
+} from "@/lib/queries";
+import { buildTrends } from "@/lib/trends";
+import { dayLabel, formatDayShort } from "@/lib/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -19,16 +26,24 @@ export default async function MetricsPage({
   searchParams,
 }: PageProps<"/metricas">) {
   const params = await searchParams;
-  const days = resolveRange(first(params.dias)).days;
+  const period = resolvePeriod({
+    dias: first(params.dias),
+    desde: first(params.desde),
+    hasta: first(params.hasta),
+  });
   const view = first(params.vista) === "toma" ? "toma" : "dia";
+  const { fromDay, toDay } = period;
+  const previous = previousPeriod(period);
 
-  const toDay = todayKey();
-  const fromDay = shiftDay(toDay, -(days - 1));
+  const [summaries, measurements, currentAverages, previousAverages] =
+    await Promise.all([
+      getDaySummaries(fromDay, toDay),
+      getMeasurementsInRange(fromDay, toDay),
+      getPeriodAverages(fromDay, toDay),
+      getPeriodAverages(previous.fromDay, previous.toDay),
+    ]);
 
-  const [summaries, measurements] = await Promise.all([
-    getDaySummaries(fromDay, toDay),
-    getMeasurementsInRange(fromDay, toDay),
-  ]);
+  const trends = buildTrends(currentAverages, previousAverages);
 
   const points =
     view === "dia"
@@ -38,10 +53,7 @@ export default async function MetricsPage({
           (summary) =>
             summary.total > 1 ? `· promedio de ${summary.total} tomas` : "",
         )
-      : toChartPoints(
-          measurements,
-          (m) => `${formatDayShort(m.day)} ${m.time}`,
-        );
+      : toChartPoints(measurements, (m) => `${formatDayShort(m.day)} ${m.time}`);
 
   const byDay = new Map<string, Measurement[]>();
   for (const m of measurements) {
@@ -50,7 +62,16 @@ export default async function MetricsPage({
     else byDay.set(m.day, [m]);
   }
 
-  const backTo = `/metricas?dias=${days}&vista=${view}`;
+  const query = new URLSearchParams({
+    ...Object.fromEntries(
+      Object.entries(periodQuery(period)).map(([key, value]) => [
+        key,
+        String(value),
+      ]),
+    ),
+    vista: view,
+  });
+  const backTo = `/metricas?${query}`;
 
   return (
     <div className="space-y-6">
@@ -62,61 +83,7 @@ export default async function MetricsPage({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1 rounded-xl bg-surface-soft p-1">
-          {RANGES.map((range) => (
-            <Link
-              key={range.days}
-              href={{
-                pathname: "/metricas",
-                query: { dias: range.days, vista: view },
-              }}
-              aria-current={range.days === days ? "page" : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                range.days === days
-                  ? "bg-surface font-medium text-fg shadow-sm"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              {range.label}
-            </Link>
-          ))}
-        </div>
-
-        <div className="flex gap-1 rounded-xl bg-surface-soft p-1">
-          {(
-            [
-              { id: "dia", label: "Por día" },
-              { id: "toma", label: "Cada toma" },
-            ] as const
-          ).map((option) => (
-            <Link
-              key={option.id}
-              href={{
-                pathname: "/metricas",
-                query: { dias: days, vista: option.id },
-              }}
-              aria-current={option.id === view ? "page" : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm transition ${
-                option.id === view
-                  ? "bg-surface font-medium text-fg shadow-sm"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              {option.label}
-            </Link>
-          ))}
-        </div>
-
-        {summaries.length > 0 ? (
-          <div className="ml-auto">
-            <ExportButtons
-              days={days}
-              fileName={reportFileName(fromDay, toDay)}
-            />
-          </div>
-        ) : null}
-      </div>
+      <PeriodControls period={period} view={view} />
 
       {summaries.length === 0 ? (
         <div className="card p-8 text-center">
@@ -129,6 +96,40 @@ export default async function MetricsPage({
         </div>
       ) : (
         <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-muted">
+              {period.custom ? "Del" : "Últimos"}{" "}
+              <strong className="font-medium text-fg">
+                {period.custom
+                  ? `${formatDayShort(fromDay)} al ${formatDayShort(toDay)}`
+                  : period.label}
+              </strong>
+            </p>
+            <ExportButtons
+              period={periodQuery(period)}
+              fileName={reportFileName(fromDay, toDay)}
+            />
+          </div>
+
+          <section className="card p-5">
+            <h2 className="mb-1 text-lg font-semibold">
+              Comparado con el período anterior
+            </h2>
+            <p className="mb-3 text-sm text-muted">
+              Contra los {period.days}{" "}
+              {period.days === 1 ? "día" : "días"} de antes (
+              {formatDayShort(previous.fromDay)} al{" "}
+              {formatDayShort(previous.toDay)}). La flecha indica en qué
+              dirección cambió el promedio.
+            </p>
+            <TrendList
+              trends={trends}
+              previousLabel={`${formatDayShort(previous.fromDay)} al ${formatDayShort(
+                previous.toDay,
+              )}`}
+            />
+          </section>
+
           <ChartGrid points={points} />
 
           <section className="card p-5">

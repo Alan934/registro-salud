@@ -193,6 +193,40 @@ export async function saveDailyNote(day: string, note: string): Promise<void> {
   `;
 }
 
+export type MetricAverage = { avg: number; count: number };
+export type PeriodAverages = Partial<Record<MetricKey, MetricAverage>>;
+
+/**
+ * Promedio de cada metrica en un rango, sobre todas las tomas (no sobre el
+ * promedio diario). Se usa para comparar un periodo contra el anterior.
+ */
+export async function getPeriodAverages(
+  fromDay: string,
+  toDay: string,
+): Promise<PeriodAverages> {
+  const columns = METRICS.map(
+    (m) =>
+      `avg(${m.key})::float8 AS avg_${m.key}, count(${m.key})::int AS n_${m.key}`,
+  ).join(", ");
+  const rows = (await sql.query(
+    `SELECT ${columns}
+       FROM measurements
+      WHERE (measured_at AT TIME ZONE '${TIME_ZONE}')::date BETWEEN $1::date AND $2::date`,
+    [fromDay, toDay],
+  )) as Row[];
+
+  const row = rows[0];
+  const averages: PeriodAverages = {};
+  if (!row) return averages;
+  for (const metric of METRICS) {
+    const avg = num(row[`avg_${metric.key}`]);
+    const count = Number(row[`n_${metric.key}`] ?? 0);
+    if (avg === null || count === 0) continue;
+    averages[metric.key] = { avg, count };
+  }
+  return averages;
+}
+
 export type LatestValue = {
   value: number;
   day: string;

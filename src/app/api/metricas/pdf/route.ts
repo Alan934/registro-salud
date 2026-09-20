@@ -1,9 +1,14 @@
 import type { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
-import { resolveRange } from "@/lib/chart-groups";
+import { previousPeriod, resolvePeriod } from "@/lib/period";
 import { buildReportPdf, reportFileName } from "@/lib/pdf";
-import { getDaySummaries, getMeasurementsInRange } from "@/lib/queries";
-import { shiftDay, todayKey } from "@/lib/tz";
+import {
+  getDaySummaries,
+  getMeasurementsInRange,
+  getPeriodAverages,
+} from "@/lib/queries";
+import { buildTrends } from "@/lib/trends";
+import { formatDayShort } from "@/lib/tz";
 
 /** El informe en PDF del período elegido, para descargar o compartir. */
 export async function GET(request: NextRequest) {
@@ -13,23 +18,34 @@ export async function GET(request: NextRequest) {
     return new Response("No autorizado.", { status: 401 });
   }
 
-  const range = resolveRange(
-    request.nextUrl.searchParams.get("dias") ?? undefined,
-  );
-  const toDay = todayKey();
-  const fromDay = shiftDay(toDay, -(range.days - 1));
+  const params = request.nextUrl.searchParams;
+  const period = resolvePeriod({
+    dias: params.get("dias") ?? undefined,
+    desde: params.get("desde") ?? undefined,
+    hasta: params.get("hasta") ?? undefined,
+  });
+  const { fromDay, toDay } = period;
+  const previous = previousPeriod(period);
 
-  const [summaries, measurements] = await Promise.all([
-    getDaySummaries(fromDay, toDay),
-    getMeasurementsInRange(fromDay, toDay),
-  ]);
+  const [summaries, measurements, currentAverages, previousAverages] =
+    await Promise.all([
+      getDaySummaries(fromDay, toDay),
+      getMeasurementsInRange(fromDay, toDay),
+      getPeriodAverages(fromDay, toDay),
+      getPeriodAverages(previous.fromDay, previous.toDay),
+    ]);
 
   const pdf = await buildReportPdf({
     summaries,
     measurements,
     fromDay,
     toDay,
-    rangeLabel: range.label,
+    // Con fechas a mano el label repetiría las fechas del encabezado.
+    rangeLabel: period.custom ? `${period.days} días` : period.label,
+    trends: buildTrends(currentAverages, previousAverages),
+    previousLabel: `${formatDayShort(previous.fromDay)} al ${formatDayShort(
+      previous.toDay,
+    )}`,
     generatedAt: new Date(),
   });
 

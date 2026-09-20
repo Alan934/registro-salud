@@ -81,6 +81,26 @@ export function dayLabel(dayKey: string): string {
   return formatDayLong(dayKey);
 }
 
+/** Si el texto es una fecha "YYYY-MM-DD" que existe de verdad. */
+export function isDayKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  // Descarta cosas como "2026-02-31", que Date acomodaria sin avisar.
+  return !Number.isNaN(date.getTime()) && toDayKeyUTC(date) === value;
+}
+
+/** "2026-09-19" de un Date, leido en UTC. */
+function toDayKeyUTC(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Dias que abarca el rango, contando los dos extremos. */
+export function daysBetween(fromDay: string, toDay: string): number {
+  const from = new Date(`${fromDay}T12:00:00Z`).getTime();
+  const to = new Date(`${toDay}T12:00:00Z`).getTime();
+  return Math.round((to - from) / 86_400_000) + 1;
+}
+
 /** Resta dias a una fecha "YYYY-MM-DD" manteniendo el formato. */
 export function shiftDay(dayKey: string, days: number): string {
   const base = new Date(`${dayKey}T12:00:00Z`);

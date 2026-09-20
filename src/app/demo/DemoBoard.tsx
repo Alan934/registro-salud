@@ -5,7 +5,7 @@ import { ChartGrid, toChartPoints } from "@/components/ChartGrid";
 import { MeasurementFields } from "@/components/MeasurementFields";
 import { MeasurementList } from "@/components/MeasurementList";
 import { MetricChips } from "@/components/MetricChips";
-import { RANGES } from "@/lib/chart-groups";
+import { RANGES } from "@/lib/period";
 import { summarizeDays, type DemoData } from "@/lib/demo-data";
 import { readMeasurementInput } from "@/lib/measurement-input";
 import { METRICS } from "@/lib/metrics";
