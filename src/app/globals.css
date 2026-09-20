@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+/*
+  Paleta semantica: se define una sola vez y las utilidades de Tailwind
+  (bg-surface, text-muted, border-line...) quedan disponibles en toda la app.
+  El modo oscuro cambia solo estas variables.
+*/
+:root {
+  color-scheme: light;
+  --page: #f6f5f2;
+  --surface: #ffffff;
+  --surface-soft: #faf9f7;
+  --line: #e6e3dd;
+  --fg: #1c1a17;
+  --muted: #6f6a61;
+  --accent: #14776a;
+  --accent-soft: #e2f1ee;
+  --accent-fg: #ffffff;
+  --danger: #b4231f;
+  --danger-soft: #fdeceb;
+  --warn: #9a5b00;
+  --warn-soft: #fdf1df;
+  --ok: #1d6b3f;
+  --ok-soft: #e6f4ea;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page: #14150f;
+    --surface: #1d1f19;
+    --surface-soft: #232620;
+    --line: #333731;
+    --fg: #f0efe9;
+    --muted: #a4a396;
+    --accent: #3fb7a3;
+    --accent-soft: #14312c;
+    --accent-fg: #07110f;
+    --danger: #f08b85;
+    --danger-soft: #37211f;
+    --warn: #e0a95a;
+    --warn-soft: #33281a;
+    --ok: #7fc99a;
+    --ok-soft: #1c2f22;
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-fg: var(--accent-fg);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --font-sans: var(--font-sans-app);
+}
+
+body {
+  background: var(--page);
+  color: var(--fg);
+}
+
+@layer components {
+  /* Campos de formulario: un solo estilo para inputs, selects y textareas. */
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base
+           text-fg outline-none transition
+           placeholder:text-muted/60
+           focus:border-accent focus:ring-2 focus:ring-accent/25;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-medium transition disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-medium transition disabled:opacity-60
+           bg-accent text-accent-fg hover:opacity-90;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+           text-sm font-medium transition disabled:opacity-60
+           border border-line bg-surface text-fg hover:bg-surface-soft;
+  }
+
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+}
+
+/* El icono nativo del datetime-local casi no se ve en modo oscuro. */
+@media (prefers-color-scheme: dark) {
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
+  }
+}
+
+/*
+  Colores de las series de los graficos. Cada tarjeta se envuelve en una de
+  estas clases y el grafico usa var(--series) / var(--series-2), asi el modo
+  oscuro se resuelve en CSS y no con JavaScript.
+  Pasos validados para cada superficie (claro #ffffff / oscuro #1d1f19).
+*/
+.series-pressure {
+  --series: #e34948;
+  --series-2: #2a78d6;
+}
+.series-pulse {
+  --series: #e87ba4;
+}
+.series-spo2 {
+  --series: #008300;
+}
+.series-glucose {
+  --series: #eb6834;
+}
+.series-weight {
+  --series: #4a3aa7;
+}
+.series-temperature {
+  --series: #eda100;
+}
+
+@media (prefers-color-scheme: dark) {
+  .series-pressure {
+    --series: #e66767;
+    --series-2: #3987e5;
+  }
+  .series-pulse {
+    --series: #d55181;
+  }
+  .series-spo2 {
+    --series: #4fa85f;
+  }
+  .series-glucose {
+    --series: #d95926;
+  }
+  .series-weight {
+    --series: #9085e9;
+  }
+  .series-temperature {
+    --series: #c98500;
+  }
+}
